@@ -9,7 +9,7 @@
 }
 
 .app-shell {
-  width: min(900px, 100%);
+  width: min(1200px, 100%);
   background: #ffffff;
   border: 1px solid #dfe7f1;
   border-radius: 18px;
@@ -27,6 +27,19 @@ h1 {
   color: #1f2937;
 }
 
+.content-grid {
+  display: grid;
+  grid-template-columns: 280px minmax(0, 1fr) 240px;
+  gap: 20px;
+  align-items: start;
+}
+
+.left-column,
+.right-column,
+.center-column {
+  min-width: 0;
+}
+
 .chat-panel {
   background: #f8fafc;
   border: 1px solid #e2e8f0;
@@ -42,11 +55,25 @@ h1 {
   gap: 10px;
 }
 
-.input-panel {
+.input-panel,
+.context-panel {
   background: #f8fafc;
   border: 1px solid #e2e8f0;
   border-radius: 12px;
   padding: 20px;
+}
+
+.context-panel h3 {
+  margin: 0 0 14px;
+  font-size: 1rem;
+  color: #1e293b;
+}
+
+.context-panel ul {
+  margin: 0;
+  padding-left: 18px;
+  color: #334155;
+  line-height: 1.8;
 }
 
 .input-label {

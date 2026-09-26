@@ -4,29 +4,52 @@
       <h1>{{ title() }}</h1>
     </header>
 
-    <div class="chat-panel">
-      <div class="messages">
-        @for (message of messages(); track message.id) {
-          <app-chat-message [message]="message" />
-        }
-      </div>
-    </div>
+    <div class="content-grid">
+      <aside class="left-column">
+        <app-history-menu
+          [items]="historyItems()"
+          [selectedId]="selectedHistoryId()"
+          (itemSelected)="openChat($event)"
+        />
+      </aside>
 
-    <div class="input-panel">
-      <label for="complaint-input" class="input-label">Panasz szövege</label>
-      <textarea
-        id="complaint-input"
-        rows="5"
-        placeholder="Írd le a panasz szövegét..."
-        [value]="draftMessage()"
-        (input)="updateDraft($any($event.target).value)"
-      ></textarea>
+      <section class="center-column">
+        <div class="chat-panel">
+          <div class="messages">
+            @for (message of messages(); track message.id) {
+              <app-chat-message [message]="message" />
+            }
+          </div>
+        </div>
 
-      <div class="actions">
-        <button type="button" (click)="sendMessage()" [disabled]="!draftMessage().trim()">
-          Küldés
-        </button>
-      </div>
+        <div class="input-panel">
+          <label for="complaint-input" class="input-label">Panasz szövege</label>
+          <textarea
+            id="complaint-input"
+            rows="5"
+            placeholder="Írd le a panasz szövegét..."
+            [value]="draftMessage()"
+            (input)="updateDraft($any($event.target).value)"
+          ></textarea>
+
+          <div class="actions">
+            <button type="button" (click)="sendMessage()" [disabled]="!draftMessage().trim()">
+              Küldés
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <aside class="right-column">
+        <div class="context-panel">
+          <h3>Kontextus</h3>
+          <ul>
+            <li>Személyes adatok eltávolítva</li>
+            <li>Prompt tisztítás megtörtént</li>
+            <li>AI válasz ellenőrizhető</li>
+          </ul>
+        </div>
+      </aside>
     </div>
   </section>
 </main>
