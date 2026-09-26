@@ -2,6 +2,26 @@
   <section class="app-shell">
     <header class="topbar">
       <h1>{{ title() }}</h1>
+
+      <div class="selector-bar">
+        <div class="selector-group">
+          <label for="model-select">Modell</label>
+          <select id="model-select" [value]="selectedModel()" (change)="selectedModel.set($any($event.target).value)">
+            @for (model of modelOptions; track model) {
+              <option [value]="model">{{ model }}</option>
+            }
+          </select>
+        </div>
+
+        <div class="selector-group">
+          <label for="version-select">Verzió</label>
+          <select id="version-select" [value]="selectedVersion()" (change)="selectedVersion.set($any($event.target).value)">
+            @for (version of modelVersionOptions; track version) {
+              <option [value]="version">{{ version }}</option>
+            }
+          </select>
+        </div>
+      </div>
     </header>
 
     <div class="content-grid">

@@ -12,6 +12,10 @@ export class App {
   protected readonly title = signal('Comply Flow UI');
   protected readonly draftMessage = signal('');
   protected readonly selectedHistoryId = signal('1');
+  protected readonly modelOptions = ['ChatGPT', 'Claude', 'Gemini'];
+  protected readonly modelVersionOptions = ['gpt-4.3', 'gpt-4o', 'o3-mini'];
+  protected readonly selectedModel = signal('ChatGPT');
+  protected readonly selectedVersion = signal('gpt-4.3');
   protected readonly historyItems = signal<HistoryMenuItem[]>([
     {
       id: '1',
