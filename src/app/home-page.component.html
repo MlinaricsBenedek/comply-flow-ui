@@ -1,0 +1,85 @@
+<main class="page">
+  <section class="app-shell">
+    <header class="topbar">
+      <h1>{{ title() }}</h1>
+
+      <div class="selector-bar">
+        <div class="selector-group">
+          <label for="model-select">Modell</label>
+          <select id="model-select" [value]="selectedModel()" (change)="selectedModel.set($any($event.target).value)">
+            @for (model of modelOptions; track model) {
+              <option [value]="model">{{ model }}</option>
+            }
+          </select>
+        </div>
+
+        <div class="selector-group">
+          <label for="version-select">Verzió</label>
+          <select id="version-select" [value]="selectedVersion()" (change)="selectedVersion.set($any($event.target).value)">
+            @for (version of modelVersionOptions; track version) {
+              <option [value]="version">{{ version }}</option>
+            }
+          </select>
+        </div>
+      </div>
+    </header>
+
+    <div class="content-grid">
+      <aside class="left-column">
+        <app-history-menu
+          [items]="historyItems()"
+          [selectedId]="selectedHistoryId()"
+          (itemSelected)="openChat($event)"
+        />
+      </aside>
+
+      <section class="center-column">
+        <div class="chat-panel">
+          <div class="messages">
+            @for (message of messages(); track message.id) {
+              <app-chat-message [message]="message" />
+            }
+          </div>
+        </div>
+
+        <div class="input-panel">
+          <label for="complaint-input" class="input-label">Panasz szövege</label>
+          <textarea
+            id="complaint-input"
+            rows="5"
+            placeholder="Írd le a panasz szövegét..."
+            [value]="draftMessage()"
+            (input)="updateDraft($any($event.target).value)"
+          ></textarea>
+
+          <div class="actions">
+            <button type="button" (click)="sendMessage()" [disabled]="!draftMessage().trim()">
+              Küldés
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <aside class="right-column">
+        <div class="context-panel">
+          <h3>Kontextus</h3>
+          <ul>
+            <li>Személyes adatok eltávolítva</li>
+            <li>Prompt tisztítás megtörtént</li>
+            <li>AI válasz ellenőrizhető</li>
+          </ul>
+
+          <div class="details-link-wrap">
+            <a
+              [routerLink]="['/details']"
+              [queryParams]="{ chatTitle: selectedChatTitle(), chatId: selectedHistoryId() }"
+              class="details-button"
+            >
+              Details
+            </a>
+          </div>
+        </div>
+      </aside>
+    </div>
+  </section>
+</main>
