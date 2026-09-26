@@ -1,3 +1,32 @@
-<main>
-  <h1>{{ title() }}</h1>
+<main class="page">
+  <section class="app-shell">
+    <header class="topbar">
+      <h1>{{ title() }}</h1>
+    </header>
+
+    <div class="chat-panel">
+      <div class="messages">
+        @for (message of messages(); track message.id) {
+          <app-chat-message [message]="message" />
+        }
+      </div>
+    </div>
+
+    <div class="input-panel">
+      <label for="complaint-input" class="input-label">Panasz szövege</label>
+      <textarea
+        id="complaint-input"
+        rows="5"
+        placeholder="Írd le a panasz szövegét..."
+        [value]="draftMessage()"
+        (input)="updateDraft($any($event.target).value)"
+      ></textarea>
+
+      <div class="actions">
+        <button type="button" (click)="sendMessage()" [disabled]="!draftMessage().trim()">
+          Küldés
+        </button>
+      </div>
+    </div>
+  </section>
 </main>
