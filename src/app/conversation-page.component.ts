@@ -1,5 +1,9 @@
-import { Component, inject, signal } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
+import { Component, computed, inject, signal } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { catchError, of } from 'rxjs';
+import { ConfigurationItem, ConfigurationService } from './configuration.service';
+import { ConversationEntry, ConversationService } from './conversation.service';
 
 interface ChatMessage {
   id: string;
@@ -26,9 +30,9 @@ interface ChatMessage {
           <div class="header-actions">
             <label class="field-group compact">
               <span>Configuration</span>
-              <select [value]="selectedConfiguration()" (change)="selectedConfiguration.set($any($event.target).value)">
-                @for (option of configurationOptions; track option) {
-                  <option [value]="option">{{ option }}</option>
+              <select [value]="selectedConfigurationId() ?? ''" (change)="onConfigurationChange($any($event.target).value)">
+                @for (option of availableConfigurations(); track option.id) {
+                  <option [value]="option.id">{{ option.name }}</option>
                 }
               </select>
             </label>
@@ -65,7 +69,7 @@ interface ChatMessage {
 
             <div class="composer-actions">
               <button type="button" class="secondary-button" [routerLink]="['/']">Cancel</button>
-              <button type="button" class="primary-button" (click)="sendMessage()" [disabled]="!draftMessage().trim()">
+              <button type="button" class="primary-button" (click)="sendMessage()" [disabled]="!draftMessage().trim() || !selectedConfigurationId()">
                 Send
               </button>
             </div>
@@ -113,14 +117,39 @@ interface ChatMessage {
 export class ConversationPageComponent {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
+  private readonly http = inject(HttpClient);
+  private readonly configurationService = inject(ConfigurationService);
+  private readonly conversationService = inject(ConversationService);
 
-  protected readonly configurationOptions = ['Template Configuration', 'LLM Configuration'];
-  protected readonly selectedConfiguration = signal('Template Configuration');
+  protected readonly availableConfigurations = this.configurationService.configurations;
+  protected readonly selectedConfigurationId = signal<number | null>(null);
   protected readonly draftMessage = signal('');
 
-  protected readonly conversationId = signal(this.route.snapshot.paramMap.get('id') ?? 'conv-101');
-  protected readonly currentTitle = signal(this.resolveTitle(this.conversationId()));
-  protected readonly messages = signal<ChatMessage[]>(this.getMessagesForConversation(this.conversationId()));
+  protected readonly conversationId = signal(this.route.snapshot.paramMap.get('id') ?? '');
+  protected readonly currentTitle = signal('Conversation');
+  protected readonly messages = signal<ChatMessage[]>([]);
+
+  protected onConfigurationChange(value: string): void {
+    const parsed = Number.parseInt(value, 10);
+    this.selectedConfigurationId.set(Number.isFinite(parsed) ? parsed : null);
+  }
+
+  constructor() {
+    this.configurationService.loadConfigurations().subscribe((configurations) => {
+      if (!this.selectedConfigurationId() && configurations.length > 0) {
+        this.selectedConfigurationId.set(configurations[0].id);
+      }
+    });
+
+    this.conversationService.loadConversations().subscribe((items) => {
+      const selected = items.find((conversation) => conversation.id === this.conversationId());
+      if (selected) {
+        this.currentTitle.set(selected.title);
+      }
+    });
+
+    this.loadMessagesForConversation(this.conversationId());
+  }
 
   protected openMessageDetails(messageId: string): void {
     this.router.navigate(['/details', this.conversationId(), messageId]);
@@ -128,88 +157,58 @@ export class ConversationPageComponent {
 
   protected sendMessage(): void {
     const text = this.draftMessage().trim();
+    const selectedConfigurationId = this.selectedConfigurationId();
 
-    if (!text) {
+    if (!text || !selectedConfigurationId) {
       return;
     }
 
     const timestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    const next = [
-      ...this.messages(),
-      {
-        id: `${this.conversationId()}-${Date.now()}`,
-        sender: 'user' as const,
-        content: text,
-        timestamp,
-      },
-      {
-        id: `message-${Date.now()}`,
-        sender: 'system' as const,
-        content: 'A rendszer a beérkező üzenetet előfeldolgozza és a releváns szabályok alapján továbbítja a feldolgozási folyamatnak.',
-        timestamp,
-      },
-    ];
+    const userMessage: ChatMessage = {
+      id: `${this.conversationId()}-${Date.now()}`,
+      sender: 'user',
+      content: text,
+      timestamp,
+    };
 
-    this.messages.set(next);
+    this.messages.update((items) => [...items, userMessage]);
     this.draftMessage.set('');
+
+    this.http
+      .post(`http://localhost:3600/api/conversations/${this.conversationId()}/messages`, {
+        content: text,
+        configurationId: selectedConfigurationId,
+      })
+      .pipe(
+        catchError(() => {
+          this.messages.update((items) => [
+            ...items,
+            {
+              id: `system-${Date.now()}`,
+              sender: 'system',
+              content: 'A rendszer a beérkező üzenetet feldolgozza, és a végső választ a feldolgozási futás eredményeként fogja megjeleníteni.',
+              timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            },
+          ]);
+          return of(null);
+        }),
+      )
+      .subscribe();
   }
 
-  private getMessagesForConversation(id: string): ChatMessage[] {
-    const dataset: Record<string, ChatMessage[]> = {
-      'conv-101': [
-        {
-          id: 'chat-1',
-          sender: 'user',
-          content: 'A múlt héten vásárolt fejhallgatóm hibásan működik. Szeretném visszakapni a pénzem.',
-          timestamp: '09:13',
-        },
-        {
-          id: 'message-1',
-          sender: 'system',
-          content: 'A rendszer előfeldolgozta a panaszt, eltávolította a személyes adatokat és a refund kérelemre vonatkozó szabályokat alkalmazta.',
-          timestamp: '09:14',
-        },
-      ],
-      'conv-102': [
-        {
-          id: 'chat-3',
-          sender: 'user',
-          content: 'A számlakivonatom nem mutatja a teljes kamatösszeget.',
-          timestamp: '08:45',
-        },
-        {
-          id: 'message-3',
-          sender: 'system',
-          content: 'A kérdésben szereplő adatok ellenőrzése megtörtént, a további lépés a banki tranzakciók összevetése.',
-          timestamp: '08:47',
-        },
-      ],
-      'conv-103': [
-        {
-          id: 'chat-5',
-          sender: 'user',
-          content: 'Kérném a termék cseréjét és a visszatérítést.',
-          timestamp: '08:03',
-        },
-        {
-          id: 'message-5',
-          sender: 'system',
-          content: 'A korábbi ügyben a kérés lezárult, a válasz ellenőrzés alatt áll.',
-          timestamp: '08:05',
-        },
-      ],
-    };
+  private loadMessagesForConversation(id: string): void {
+    if (!id) {
+      this.messages.set([]);
+      return;
+    }
 
-    return dataset[id] ?? dataset['conv-101'];
-  }
-
-  private resolveTitle(id: string): string {
-    const titles: Record<string, string> = {
-      'conv-101': 'Fejhallgató reklamáció',
-      'conv-102': 'Számlakivonat és kamatvitás',
-      'conv-103': 'Termékcsere kérése',
-    };
-
-    return titles[id] ?? 'New conversation';
+    this.http
+      .get<ChatMessage[]>(`http://localhost:3600/api/conversations/${id}/messages`)
+      .pipe(
+        catchError(() => of([])),
+      )
+      .subscribe((messages) => {
+        this.messages.set(messages);
+      });
   }
 }
