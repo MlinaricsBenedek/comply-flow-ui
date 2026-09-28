@@ -71,8 +71,8 @@ interface DetailEntry {
 
           <div class="meta-grid">
             <div class="meta-box">
-              <span class="meta-label">Configuration</span>
-              <strong>{{ selectedDetail().configurationName }}</strong>
+              <span class="meta-label">Applied configuration</span>
+              <strong>{{ appliedConfigurationName() }}</strong>
             </div>
             <div class="meta-box">
               <span class="meta-label">Mode</span>
@@ -323,6 +323,9 @@ export class DetailsPageComponent {
       this.visibleEntries().find((entry) => entry.messageTitle === this.selectedDetailTitle()) ??
       this.visibleEntries()[0]
     );
+  });
+  protected readonly appliedConfigurationName = computed(() => {
+    return this.route.snapshot.queryParamMap.get('configurationName') ?? this.selectedDetail()?.configurationName ?? 'N/A';
   });
 
   protected readonly objectEntries = <T extends object>(source: T): [string, string | number | boolean][] =>

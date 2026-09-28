@@ -123,7 +123,11 @@ export class ConversationPageComponent {
   protected readonly messages = signal<ChatMessage[]>(this.getMessagesForConversation(this.conversationId()));
 
   protected openMessageDetails(messageId: string): void {
-    this.router.navigate(['/details', this.conversationId(), messageId]);
+    this.router.navigate(['/details', this.conversationId(), messageId], {
+      queryParams: {
+        configurationName: this.selectedConfiguration(),
+      },
+    });
   }
 
   protected sendMessage(): void {
