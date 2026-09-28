@@ -134,7 +134,8 @@ export class CreateConfigurationPageComponent {
           }),
     };
 
-    this.configurationService.addConfiguration(config);
-    this.router.navigate(['/configurations', config.id]);
+    this.configurationService.addConfiguration(config).subscribe(() => {
+      this.router.navigate(['/configurations', config.id]);
+    });
   }
 }

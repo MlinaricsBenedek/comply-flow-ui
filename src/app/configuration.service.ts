@@ -1,4 +1,6 @@
-import { Injectable, signal } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
+import { Injectable, inject, signal } from '@angular/core';
+import { catchError, delay, map, Observable, of } from 'rxjs';
 
 export type ConfigurationType = 'Template' | 'LLM';
 export type GenerationMode = 'template' | 'llm';
@@ -17,7 +19,12 @@ export interface ConfigurationItem {
 
 @Injectable({ providedIn: 'root' })
 export class ConfigurationService {
-  private readonly configurationsSignal = signal<ConfigurationItem[]>([
+  private readonly http = inject(HttpClient);
+  private readonly configurationsSignal = signal<ConfigurationItem[]>([]);
+
+  readonly configurations = this.configurationsSignal.asReadonly();
+
+  readonly mockConfigurations: ConfigurationItem[] = [
     {
       id: 1,
       name: 'Template Configuration',
@@ -39,11 +46,39 @@ export class ConfigurationService {
         maxTokens: 500,
       },
     },
-  ]);
+  ];
 
-  readonly configurations = this.configurationsSignal.asReadonly();
+  loadConfigurations(): Observable<ConfigurationItem[]> {
+    return this.http.get<ConfigurationItem[]>('http://localhost:3600/api/configurations').pipe(
+      delay(150),
+      map((items) => {
+        this.configurationsSignal.set(items.length ? items : this.mockConfigurations);
+        return items.length ? items : this.mockConfigurations;
+      }),
+    );
+  }
 
-  addConfiguration(config: ConfigurationItem): void {
-    this.configurationsSignal.update((items) => [config, ...items]);
+  getConfigurationById(id: number): Observable<ConfigurationItem | undefined> {
+    return this.http.get<ConfigurationItem>(`http://localhost:3600/api/configurations/${id}`).pipe(
+      delay(120),
+      map((item) => item),
+      catchError(() => of(this.mockConfigurations.find((config) => config.id === id))),
+    );
+  }
+
+  addConfiguration(config: ConfigurationItem): Observable<ConfigurationItem> {
+    return this.http.post<ConfigurationItem>('http://localhost:3600/api/configurations', config).pipe(
+      delay(150),
+      map((created) => {
+        const next = [created, ...this.configurationsSignal()];
+        this.configurationsSignal.set(next);
+        return created;
+      }),
+      catchError(() => {
+        const created = { ...config };
+        this.configurationsSignal.update((items) => [created, ...items]);
+        return of(created);
+      }),
+    );
   }
 }

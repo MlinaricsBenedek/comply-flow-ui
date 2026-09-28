@@ -150,6 +150,10 @@ export class ConfigurationPageComponent {
   protected readonly configurations = this.configurationService.configurations;
   protected readonly selectedId = signal<number>(this.readSelectedId());
 
+  constructor() {
+    this.configurationService.loadConfigurations().subscribe();
+  }
+
   protected readonly selectedConfiguration = computed<ConfigurationItem>(() => {
     return (
       this.configurations().find((config) => config.id === this.selectedId()) ??
