@@ -1,15 +1,6 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
-
-interface ConversationEntry {
-  id: string;
-  title: string;
-  summary: string;
-  status: 'New' | 'In review' | 'Resolved';
-  statusKey: 'new' | 'review' | 'resolved';
-  createdAt: string;
-  updatedAt: string;
-}
+import { ConversationEntry, ConversationService } from './conversation.service';
 
 @Component({
   selector: 'app-home-page',
@@ -19,38 +10,15 @@ interface ConversationEntry {
 })
 export class HomePageComponent {
   private readonly router = inject(Router);
+  private readonly conversationService = inject(ConversationService);
 
   protected readonly title = signal('Comply Flow');
-  protected readonly conversations = signal<ConversationEntry[]>([
-    {
-      id: 'conv-101',
-      title: 'Fejhallgató reklamáció',
-      summary: 'Ár és minőség eltérés a rendelésben.',
-      status: 'New',
-      statusKey: 'new',
-      createdAt: '2026-09-27',
-      updatedAt: '09:15',
-    },
-    {
-      id: 'conv-102',
-      title: 'Számlakivonat és kamatvitás',
-      summary: 'A felhasználó a kamat és a követelés összegét vitatja.',
-      status: 'In review',
-      statusKey: 'review',
-      createdAt: '2026-09-25',
-      updatedAt: '08:50',
-    },
-    {
-      id: 'conv-103',
-      title: 'Termékcsere kérése',
-      summary: 'A vevő a termék cseréjét és a pénzvisszatérítést kéri.',
-      status: 'Resolved',
-      statusKey: 'resolved',
-      createdAt: '2026-09-21',
-      updatedAt: '08:10',
-    },
-  ]);
+  protected readonly conversations = this.conversationService.conversations;
   protected readonly selectedConversationId = signal('conv-101');
+
+  constructor() {
+    this.conversationService.loadConversations().subscribe();
+  }
   protected readonly showCreateModal = signal(false);
   protected readonly newConversationTitle = signal('');
 
@@ -91,21 +59,10 @@ export class HomePageComponent {
       return;
     }
 
-    const now = new Date();
-    const id = `conv-${now.getTime()}`;
-    const newEntry: ConversationEntry = {
-      id,
-      title,
-      summary: 'Új beszélgetés létrehozva. Az ügyfél üzenete hamarosan feldolgozásra kerül.',
-      status: 'New',
-      statusKey: 'new',
-      createdAt: now.toISOString().slice(0, 10),
-      updatedAt: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-    };
-
-    this.conversations.update((items) => [newEntry, ...items]);
-    this.selectedConversationId.set(id);
-    this.closeCreateModal();
-    this.router.navigate(['/conversation', id]);
+    this.conversationService.createConversation(title).subscribe((created) => {
+      this.selectedConversationId.set(created.id);
+      this.closeCreateModal();
+      this.router.navigate(['/conversation', created.id]);
+    });
   }
 }
