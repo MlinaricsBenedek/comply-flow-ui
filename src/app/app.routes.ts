@@ -7,6 +7,7 @@ export const routes: Routes = [
   { path: '', component: HomePageComponent },
   { path: 'conversation/:id', component: ConversationPageComponent },
   { path: 'conversation', component: ConversationPageComponent },
+  { path: 'details/:conversationId/:messageId', component: DetailsPageComponent },
   { path: 'details', component: DetailsPageComponent },
   { path: '**', redirectTo: '' },
 ];

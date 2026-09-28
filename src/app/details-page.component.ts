@@ -2,6 +2,7 @@ import { Component, computed, inject, signal } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 
 interface DetailEntry {
+  messageId: string;
   messageTitle: string;
   summary: string;
   preprocessedText: string;
@@ -89,71 +90,84 @@ export class DetailsPageComponent {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
 
+  protected readonly conversationId = signal(this.route.snapshot.paramMap.get('conversationId') ?? this.route.snapshot.queryParamMap.get('chatId') ?? '1');
+  protected readonly messageId = signal(this.route.snapshot.paramMap.get('messageId') ?? this.route.snapshot.queryParamMap.get('messageId') ?? 'message-1');
   protected readonly chatTitle = signal(this.route.snapshot.queryParamMap.get('chatTitle') ?? 'Details');
-  protected readonly selectedHistoryId = signal(this.route.snapshot.queryParamMap.get('chatId') ?? '1');
 
-  protected readonly visibleEntries = signal<DetailEntry[]>(this.getVisibleEntriesForChat(this.selectedHistoryId()));
-  protected readonly selectedDetailTitle = signal(this.visibleEntries()[0]?.messageTitle ?? 'Details');
-  protected readonly selectedDetail = computed(() =>
-    this.visibleEntries().find((entry) => entry.messageTitle === this.selectedDetailTitle()) ?? this.visibleEntries()[0],
+  protected readonly visibleEntries = signal<DetailEntry[]>(this.getVisibleEntriesForChat(this.conversationId()));
+  protected readonly selectedDetailTitle = signal(
+    this.visibleEntries().find((entry) => entry.messageId === this.messageId())?.messageTitle ?? this.visibleEntries()[0]?.messageTitle ?? 'Details',
   );
+  protected readonly selectedDetail = computed(() => {
+    return (
+      this.visibleEntries().find((entry) => entry.messageId === this.messageId()) ??
+      this.visibleEntries().find((entry) => entry.messageTitle === this.selectedDetailTitle()) ??
+      this.visibleEntries()[0]
+    );
+  });
 
   protected goBack(): void {
-    this.router.navigate(['/']);
+    this.router.navigate(['/conversation', this.conversationId()]);
   }
 
   private getVisibleEntriesForChat(chatId: string): DetailEntry[] {
     const entriesByChat: Record<string, DetailEntry[]> = {
-      '1': [
+      'conv-101': [
         {
-          messageTitle: 'Tóth Jakab vagyok, az egyenlegem 100000000 Ft, és 50 Ft kamatot kaptam. Miért nem 100 Ft-ot?',
-          summary: 'A panaszban szereplő kamatösszeg és az ügyfél által megadott érték összehasonlítása.',
-          preprocessedText: 'Tóth Jakab, 100000000 Ft egyenleg, 50 Ft kamat, összeg és kamat ellenőrzése szükséges.',
-          rules: ['Személyes adatok eltávolítása', 'Számértékek validálása', 'Panasz logikájának ellenőrzése'],
-          finalPrompt: 'Ellenőrizd a panaszban szereplő kamatösszeg és a tényadatok konzisztenciáját, és jelezd a különbségeket a felhasználó számára.',
+          messageId: 'message-1',
+          messageTitle: 'A múlt héten vásárolt fejhallgatóm hibásan működik. Szeretném visszakapni a pénzem.',
+          summary: 'A panaszban szereplő hiba és a visszatérítés kérése.',
+          preprocessedText: 'Fejhallgató hibás, pénzvisszatérítés kérés.',
+          rules: ['Személyes adatok eltávolítása', 'Termékhiba észlelése', 'Refund kérelem ellenőrzése'],
+          finalPrompt: 'Értékelje a fejhallgató hibáját és a pénzvisszatérítés jogosságát a rendelkezésre álló tények alapján.',
         },
         {
-          messageTitle: 'A kérdésben a név személyes adat, ezért az LLM-nek nem továbbítjuk. A biztonsági szabály miatt a rendszer a személyes adatokat eltávolítja, majd a tisztított szöveg alapján válaszol.',
-          summary: 'A kérdésből a személyes adatok eltávolítása és a további feldolgozás biztonságosítása.',
-          preprocessedText: 'A felhasználó megadott azonosításra alkalmas adatokat, amelyeket eltávolítottunk a promptből.',
-          rules: ['Név eltávolítása', 'Számlaszám anonimizálása', 'Biztonsági szabály alkalmazása'],
-          finalPrompt: 'A promptet anonimizált formában továbbítsd az LLM-nek, és csak a releváns üzleti kontextust tartsd meg.',
-        },
-      ],
-      '2': [
-        {
-          messageTitle: 'A banki számlakivonatomban 5000 Ft kamat szerepel, de nem látom a követelés összegét.',
-          summary: 'A banki kamat és a követelés összegének összefüggésének ellenőrzése.',
-          preprocessedText: 'A banki kivonatban szereplő 5000 Ft kamat, a felhasználó szerint nem látszik a követelés összegének összevetéséhez.',
-          rules: ['Adatbiztonság', 'Összefüggés ellenőrzése', 'Felhasználó által látott adatok használata'],
-          finalPrompt: 'Azonosítsd a közvetlenül látható pénzügyi adatokat, és ellenőrizd, hogy a követelés összege konzisztens-e a banki kivonattal.',
-        },
-        {
-          messageTitle: 'A rendszer eltávolította a személyes azonosítót és a releváns adatokat összegyűjtötte a banki kamat és a kérdés logikájához.',
-          summary: 'A rendszer által tisztított kontextus és a releváns adatok összegyűjtése a döntéshez.',
-          preprocessedText: 'Személyes azonosító eltávolítva, a banki kamat és kérdés logikája maradt a további feldolgozásban.',
-          rules: ['Személyes azonosító eltávolítása', 'Összefüggő adatok megtartása', 'Kérdés logikájának ellenőrzése'],
-          finalPrompt: 'A tisztított kontextus alapján határozd meg, mely adatok relevánsak a kamat és követelés ellenőrzéséhez.',
+          messageId: 'message-2',
+          messageTitle: 'A rendszer előfeldolgozta a panaszt, eltávolította a személyes adatokat és a refund kérelemre vonatkozó szabályokat alkalmazta.',
+          summary: 'A rendszertisztítás és a szabályalapú döntés folyamatának összefoglalása.',
+          preprocessedText: 'Személyes adatok eltávolítva, a refund logika a további feldolgozásban maradt.',
+          rules: ['Név eltávolítása', 'Adatbiztonság', 'Refund logika alkalmazása'],
+          finalPrompt: 'A tisztított kontextus alapján határozd meg a refund döntéshez szükséges következtetéseket.',
         },
       ],
-      '3': [
+      'conv-102': [
         {
-          messageTitle: 'Miért nem kaptam meg a teljes felárat a panaszom után?',
-          summary: 'Az ügyfél által megjelölt felár és a korábbi lezárási döntés összehasonlítása.',
-          preprocessedText: 'Miért nem kaptam meg a teljes felárat a panaszom után?',
-          rules: ['Felár ellenőrzése', 'Kérdés logikájának feldolgozása', 'Bizonyítékok értékelése'],
-          finalPrompt: 'Értékeljék a felár kérdését a korábbi döntés és a felhasználó által megadott információk alapján.',
+          messageId: 'message-3',
+          messageTitle: 'A számlakivonatom nem mutatja a teljes kamatösszeget.',
+          summary: 'A banki kamat és a követelés összegének összehasonlítása.',
+          preprocessedText: 'A számlakivonatból hiányzik a teljes kamatösszeg.',
+          rules: ['Adatbiztonság', 'Összefüggés ellenőrzése', 'Kamatfeldolgozás'],
+          finalPrompt: 'Azonosítsd a hiányzó kamatösszeget és ellenőrizd a konzisztenciát a banki adatokkal.',
         },
         {
-          messageTitle: 'A korábbi felülvizsgálat alapján a kérdés lezárult, és a válasz ellenőrzés alatt áll.',
-          summary: 'A lezárási állapot és a válasz ellenőrzésének áttekintése.',
-          preprocessedText: 'A korábbi felülvizsgálat alapján a kérdés lezárult, és a válasz ellenőrzés alatt áll.',
-          rules: ['Lezárási állapot megjelenítése', 'Válasz ellenőrzése', 'Audit követelmények betartása'],
-          finalPrompt: 'A lezárt ügyben ellenőrizd, hogy a válasz megfelel-e az audit és a döntési nyomvonal követelményeinek.',
+          messageId: 'message-4',
+          messageTitle: 'A kérdésben szereplő adatok ellenőrzése megtörtént, a további lépés a banki tranzakciók összevetése.',
+          summary: 'A banki tranzakciók ellenőrzése és a releváns adatok összegyűjtése.',
+          preprocessedText: 'Banki tranzakciók és kérdés logikája összevetése szükséges.',
+          rules: ['Személyes adatok eltávolítása', 'Tranzakció ellenőrzése', 'Kérdés logikájának validálása'],
+          finalPrompt: 'Ellenőrizd a banki tranzakciók és a kérdés logikája közötti összefüggést.',
+        },
+      ],
+      'conv-103': [
+        {
+          messageId: 'message-5',
+          messageTitle: 'Kérném a termék cseréjét és a visszatérítést.',
+          summary: 'A termékcsere és a refund kérése.',
+          preprocessedText: 'Termékcsere és pénzvisszatérítés kérés.',
+          rules: ['Felár ellenőrzése', 'Csere kérelem', 'Refund döntés'],
+          finalPrompt: 'Értékelje a termékcsere-kérelem és a refund logikáját a rendelkezésre álló adatok alapján.',
+        },
+        {
+          messageId: 'message-6',
+          messageTitle: 'A korábbi ügyben a kérés lezárult, a válasz ellenőrzés alatt áll.',
+          summary: 'A lezárás és ellenőrzés állapotának vizsgálata.',
+          preprocessedText: 'A korábbi felülvizsgálat alapján a kérdés lezárult.',
+          rules: ['Lezárás', 'Válasz ellenőrzése', 'Audit követelmények'],
+          finalPrompt: 'Ellenőrizd, hogy a lezárt ügyben a válasz megfelel-e az audit és nyomkövetési követelményeknek.',
         },
       ],
     };
 
-    return entriesByChat[chatId] ?? entriesByChat['1'];
+    return entriesByChat[chatId] ?? entriesByChat['conv-101'];
   }
 }

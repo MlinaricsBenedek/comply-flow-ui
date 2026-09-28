@@ -1,5 +1,5 @@
 import { Component, inject, signal } from '@angular/core';
-import { ActivatedRoute, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 
 interface ChatMessage {
   id: string;
@@ -39,10 +39,18 @@ interface ChatMessage {
           <div class="chat-thread">
             @for (message of messages(); track message.id) {
               <div class="message-row" [class.user]="message.sender === 'user'" [class.system]="message.sender === 'system'">
-                <div class="message-bubble">
-                  <p>{{ message.content }}</p>
-                  <span>{{ message.timestamp }}</span>
-                </div>
+                @if (message.sender === 'system') {
+                  <button type="button" class="message-bubble clickable-message" (click)="openMessageDetails(message.id)" aria-label="Open message details">
+                    <span class="hover-label">details</span>
+                    <p>{{ message.content }}</p>
+                    <span>{{ message.timestamp }}</span>
+                  </button>
+                } @else {
+                  <div class="message-bubble">
+                    <p>{{ message.content }}</p>
+                    <span>{{ message.timestamp }}</span>
+                  </div>
+                }
               </div>
             }
           </div>
@@ -87,10 +95,13 @@ interface ChatMessage {
     '.message-row { display: flex; }',
     '.message-row.user { justify-content: flex-end; }',
     '.message-row.system { justify-content: flex-start; }',
-    '.message-bubble { max-width: min(72%, 620px); border-radius: 16px; padding: 12px 14px; box-shadow: 0 8px 22px rgba(15, 23, 42, 0.05); }',
+    '.message-bubble { position: relative; max-width: min(72%, 620px); border-radius: 16px; padding: 12px 14px; box-shadow: 0 8px 22px rgba(15, 23, 42, 0.05); }',
     '.message-row.user .message-bubble { background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%); color: #ffffff; }',
     '.message-row.system .message-bubble { background: #eef2ff; color: #1e293b; }',
-    '.message-bubble p { margin: 0 0 6px; line-height: 1.5; }',
+    '.clickable-message { border: none; text-align: left; cursor: pointer; position: relative; }',
+    '.hover-label { position: absolute; right: 12px; top: 8px; font-size: 0.6rem; letter-spacing: 0.08em; text-transform: lowercase; opacity: 0; transition: opacity 0.2s ease; color: #1d4ed8; z-index: 1; }',
+    '.clickable-message:hover .hover-label, .clickable-message:focus-visible .hover-label { opacity: 1; }',
+    '.message-bubble p { margin: 18px 0 6px; line-height: 1.5; }',
     '.message-bubble span { display: block; font-size: 0.7rem; opacity: 0.8; }',
     '.composer { margin-top: 18px; border-top: 1px solid #e2e8f0; padding-top: 18px; }',
     '.composer textarea { width: 100%; box-sizing: border-box; resize: vertical; border-radius: 12px; border: 1px solid #cbd5e1; padding: 0.9rem 1rem; font: inherit; min-height: 90px; }',
@@ -101,6 +112,7 @@ interface ChatMessage {
 })
 export class ConversationPageComponent {
   private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
 
   protected readonly configurationOptions = ['Template Configuration', 'LLM Configuration'];
   protected readonly selectedConfiguration = signal('Template Configuration');
@@ -109,6 +121,10 @@ export class ConversationPageComponent {
   protected readonly conversationId = signal(this.route.snapshot.paramMap.get('id') ?? 'conv-101');
   protected readonly currentTitle = signal(this.resolveTitle(this.conversationId()));
   protected readonly messages = signal<ChatMessage[]>(this.getMessagesForConversation(this.conversationId()));
+
+  protected openMessageDetails(messageId: string): void {
+    this.router.navigate(['/details', this.conversationId(), messageId]);
+  }
 
   protected sendMessage(): void {
     const text = this.draftMessage().trim();
@@ -127,7 +143,7 @@ export class ConversationPageComponent {
         timestamp,
       },
       {
-        id: `${this.conversationId()}-${Date.now()}-system`,
+        id: `message-${Date.now()}`,
         sender: 'system' as const,
         content: 'A rendszer a beérkező üzenetet előfeldolgozza és a releváns szabályok alapján továbbítja a feldolgozási folyamatnak.',
         timestamp,
@@ -148,7 +164,7 @@ export class ConversationPageComponent {
           timestamp: '09:13',
         },
         {
-          id: 'chat-2',
+          id: 'message-1',
           sender: 'system',
           content: 'A rendszer előfeldolgozta a panaszt, eltávolította a személyes adatokat és a refund kérelemre vonatkozó szabályokat alkalmazta.',
           timestamp: '09:14',
@@ -162,7 +178,7 @@ export class ConversationPageComponent {
           timestamp: '08:45',
         },
         {
-          id: 'chat-4',
+          id: 'message-3',
           sender: 'system',
           content: 'A kérdésben szereplő adatok ellenőrzése megtörtént, a további lépés a banki tranzakciók összevetése.',
           timestamp: '08:47',
@@ -176,7 +192,7 @@ export class ConversationPageComponent {
           timestamp: '08:03',
         },
         {
-          id: 'chat-6',
+          id: 'message-5',
           sender: 'system',
           content: 'A korábbi ügyben a kérés lezárult, a válasz ellenőrzés alatt áll.',
           timestamp: '08:05',
