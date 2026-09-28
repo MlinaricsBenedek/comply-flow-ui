@@ -1,4 +1,5 @@
-import { Component, computed, signal } from '@angular/core';
+import { Component, computed, inject, signal } from '@angular/core';
+import { Router, RouterLink } from '@angular/router';
 
 interface ConversationEntry {
   id: string;
@@ -12,11 +13,13 @@ interface ConversationEntry {
 
 @Component({
   selector: 'app-home-page',
-  imports: [],
+  imports: [RouterLink],
   styleUrl: './app.css',
   templateUrl: './home-page.component.html',
 })
 export class HomePageComponent {
+  private readonly router = inject(Router);
+
   protected readonly title = signal('Comply Flow');
   protected readonly conversations = signal<ConversationEntry[]>([
     {
@@ -103,5 +106,6 @@ export class HomePageComponent {
     this.conversations.update((items) => [newEntry, ...items]);
     this.selectedConversationId.set(id);
     this.closeCreateModal();
+    this.router.navigate(['/conversation', id]);
   }
 }

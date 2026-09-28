@@ -24,10 +24,10 @@
 
         <div class="conversation-list">
           @for (conversation of conversations(); track conversation.id) {
-            <button
-              type="button"
+            <a
               class="conversation-card"
               [class.active]="selectedConversationId() === conversation.id"
+              [routerLink]="['/conversation', conversation.id]"
               (click)="openConversation(conversation.id)"
             >
               <div class="conversation-topline">
@@ -37,7 +37,7 @@
 
               <h3>{{ conversation.title }}</h3>
               <p>{{ conversation.summary }}</p>
-            </button>
+            </a>
           }
         </div>
       </section>
@@ -64,7 +64,9 @@
 
           <p class="summary-copy">{{ selectedConversation().summary }}</p>
 
-          <button type="button" class="secondary-button full-width">Open conversation</button>
+          <a class="secondary-button full-width center-button" [routerLink]="['/conversation', selectedConversation().id]">
+            Open conversation
+          </a>
         </div>
       </aside>
     </div>
