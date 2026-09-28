@@ -382,8 +382,8 @@ Home
 │   └── Message Details
 │
 └── Configurations
-├── Configuration Details
-└── Create Configuration
+    ├── Configuration Details
+    └── Create Configuration
 
 ---
 
