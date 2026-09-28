@@ -1,85 +1,102 @@
-<main class="page">
-  <section class="app-shell">
+<main class="home-page">
+  <section class="home-shell">
     <header class="topbar">
-      <h1>{{ title() }}</h1>
+      <div class="brand-block">
+        <span class="brand-badge">AI PANASZKEZELŐ</span>
+        <h1>{{ title() }}</h1>
+      </div>
 
-      <div class="selector-bar">
-        <div class="selector-group">
-          <label for="model-select">Modell</label>
-          <select id="model-select" [value]="selectedModel()" (change)="selectedModel.set($any($event.target).value)">
-            @for (model of modelOptions; track model) {
-              <option [value]="model">{{ model }}</option>
-            }
-          </select>
-        </div>
-
-        <div class="selector-group">
-          <label for="version-select">Verzió</label>
-          <select id="version-select" [value]="selectedVersion()" (change)="selectedVersion.set($any($event.target).value)">
-            @for (version of modelVersionOptions; track version) {
-              <option [value]="version">{{ version }}</option>
-            }
-          </select>
-        </div>
+      <div class="topbar-actions">
+        <button type="button" class="secondary-button">Configurations</button>
+        <button type="button" class="primary-button" (click)="openCreateModal()">+ New Conversation</button>
       </div>
     </header>
 
-    <div class="content-grid">
-      <aside class="left-column">
-        <app-history-menu
-          [items]="historyItems()"
-          [selectedId]="selectedHistoryId()"
-          (itemSelected)="openChat($event)"
-        />
-      </aside>
-
-      <section class="center-column">
-        <div class="chat-panel">
-          <div class="messages">
-            @for (message of messages(); track message.id) {
-              <app-chat-message [message]="message" />
-            }
+    <div class="content-panel">
+      <section class="conversation-panel">
+        <div class="panel-header">
+          <div>
+            <p class="eyebrow">Recent cases</p>
+            <h2>Conversations</h2>
           </div>
+          <span class="count-pill">{{ conversations().length }} total</span>
         </div>
 
-        <div class="input-panel">
-          <label for="complaint-input" class="input-label">Panasz szövege</label>
-          <textarea
-            id="complaint-input"
-            rows="5"
-            placeholder="Írd le a panasz szövegét..."
-            [value]="draftMessage()"
-            (input)="updateDraft($any($event.target).value)"
-          ></textarea>
+        <div class="conversation-list">
+          @for (conversation of conversations(); track conversation.id) {
+            <button
+              type="button"
+              class="conversation-card"
+              [class.active]="selectedConversationId() === conversation.id"
+              (click)="openConversation(conversation.id)"
+            >
+              <div class="conversation-topline">
+                <span class="status-badge status-{{ conversation.statusKey }}">{{ conversation.status }}</span>
+                <span class="created-at">{{ conversation.createdAt }}</span>
+              </div>
 
-          <div class="actions">
-            <button type="button" (click)="sendMessage()" [disabled]="!draftMessage().trim()">
-              Küldés
+              <h3>{{ conversation.title }}</h3>
+              <p>{{ conversation.summary }}</p>
             </button>
-          </div>
+          }
         </div>
       </section>
 
-      <aside class="right-column">
-        <div class="context-panel">
-          <h3>Kontextus</h3>
-          <ul>
-            <li>Személyes adatok eltávolítva</li>
-            <li>Prompt tisztítás megtörtént</li>
-            <li>AI válasz ellenőrizhető</li>
-          </ul>
+      <aside class="overview-panel">
+        <div class="summary-card">
+          <p class="eyebrow">Selected conversation</p>
+          <h3>{{ selectedConversation().title }}</h3>
 
-          <div class="details-link-wrap">
-            <a
-              [routerLink]="['/details']"
-              [queryParams]="{ chatTitle: selectedChatTitle(), chatId: selectedHistoryId() }"
-              class="details-button"
-            >
-              Details
-            </a>
-          </div>
+          <dl class="meta-list">
+            <div>
+              <dt>Status</dt>
+              <dd>{{ selectedConversation().status }}</dd>
+            </div>
+            <div>
+              <dt>Created</dt>
+              <dd>{{ selectedConversation().createdAt }}</dd>
+            </div>
+            <div>
+              <dt>Last update</dt>
+              <dd>{{ selectedConversation().updatedAt }}</dd>
+            </div>
+          </dl>
+
+          <p class="summary-copy">{{ selectedConversation().summary }}</p>
+
+          <button type="button" class="secondary-button full-width">Open conversation</button>
         </div>
       </aside>
     </div>
   </section>
+
+  @if (showCreateModal()) {
+    <div class="modal-backdrop" (click)="closeCreateModal()">
+      <div class="modal-card" (click)="$event.stopPropagation()">
+        <div class="modal-header">
+          <div>
+            <p class="eyebrow">New</p>
+            <h3>Create conversation</h3>
+          </div>
+          <button type="button" class="close-button" (click)="closeCreateModal()" aria-label="Close dialog">×</button>
+        </div>
+
+        <label for="conversation-title" class="field-label">Conversation title</label>
+        <input
+          id="conversation-title"
+          type="text"
+          [value]="newConversationTitle()"
+          (input)="newConversationTitle.set($any($event.target).value)"
+          placeholder="Fejhallgató reklamáció"
+        />
+
+        <div class="modal-actions">
+          <button type="button" class="secondary-button" (click)="closeCreateModal()">Cancel</button>
+          <button type="button" class="primary-button" (click)="createConversation()" [disabled]="!newConversationTitle().trim()">
+            Save
+          </button>
+        </div>
+      </div>
+    </div>
+  }
 </main>

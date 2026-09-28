@@ -110,7 +110,48 @@ A részletes audit és ellenőrzési nézet, ahol a felhasználó megtekintheti,
 
 ---
 
-## 3. Adatstruktúra
+## 3. ConfigPage
+### Feladata
+A konfigurációs oldal elkülönített felületet biztosít a futtatási beállításokhoz.
+
+### Komponensek
+#### ConfigHeader
+- Feladata: a konfigurációs oldal fejléce.
+- Tartalma: „Configuration” vagy „Beállítások”.
+
+#### RuleVersionSelector
+- Feladata: szabálykészlet vagy szabályverzió kiválasztása.
+- Példák:
+  - Rule Set v1
+  - Rule Set v2
+  - Compliance EU
+
+#### ResponseModeSelector
+- Feladata: válaszgenerálási mód kiválasztása.
+- A prototípusban alapértelmezetten LLM.
+- A felhasználó itt tudja kiválasztani, hogy a rendszer LLM vagy sablonalapú módon működjön.
+
+#### PromptVersionSelector
+- Feladata: prompt verzió kiválasztása.
+- A verziózást az auditálhatóság és az ismételhetőség indokolja.
+
+#### ModelSelector
+- Feladata: modell kiválasztása.
+- A modell választás a konfigurációs oldalhoz tartozik.
+
+#### ModelParameterControls
+- Feladata: a főbb modellparaméterek beállítása.
+- Példák:
+  - temperature
+  - max tokens
+
+#### AuditLoggingToggle
+- Feladata: az audit naplózás bekapcsolása vagy kikapcsolása.
+- A rendszer alapértelmezetten logol.
+
+---
+
+## 4. Adatstruktúra
 ### ChatHistoryItem
 A chat history item esetén elegendő csak a summary mezőt megjeleníteni.
 

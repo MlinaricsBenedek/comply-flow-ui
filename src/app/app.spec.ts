@@ -1,24 +1,26 @@
 import { TestBed } from '@angular/core/testing';
-import { App } from './app';
+import { HomePageComponent } from './home-page.component';
 
-describe('App', () => {
+describe('HomePageComponent', () => {
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [App],
-    })
-      .compileComponents();
+      imports: [HomePageComponent],
+    }).compileComponents();
   });
 
-  it('should create the app', () => {
-    const fixture = TestBed.createComponent(App);
-    const app = fixture.componentInstance;
-    expect(app).toBeTruthy();
+  it('should create the component', () => {
+    const fixture = TestBed.createComponent(HomePageComponent);
+    const component = fixture.componentInstance;
+    expect(component).toBeTruthy();
   });
 
-  it('should render title', async () => {
-    const fixture = TestBed.createComponent(App);
+  it('should render the app title and conversation list', async () => {
+    const fixture = TestBed.createComponent(HomePageComponent);
     await fixture.whenStable();
     const compiled = fixture.nativeElement as HTMLElement;
-    expect(compiled.querySelector('h1')?.textContent).toContain('Hello, comply-flow-ui');
+
+    expect(compiled.querySelector('h1')?.textContent).toContain('Comply Flow');
+    expect(compiled.querySelectorAll('.conversation-card').length).toBeGreaterThan(0);
+    expect(compiled.textContent).toContain('Configurations');
   });
 });

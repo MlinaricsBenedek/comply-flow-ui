@@ -1,211 +1,425 @@
-# SKILL.md
+Tervezd meg egy modern, letisztult webalkalmazás UI-ját az alábbi backend API és UI workflow alapján.
 
-## Projekt célja
-A Comply Flow UI célja, hogy egy auditálható, szabályvezérelt panaszkezelő rendszer felhasználói felületét megtervezze és implementálja kizárólag a frontend számára. A rendszer AI támogatással segíti a panaszok feldolgozását, ugyanakkor biztosítja a szabályok és az adatok nyomon követhetőségét.
+## Alkalmazás célja
 
-A UI-nak nem a backend logika a központi eleme, hanem az auditálhatóság, a kontextus láthatósága és a beszélgetés folytathatósága.
+Az alkalmazás egy AI-alapú panaszkezelő rendszer. A felhasználó beszélgetéseket hozhat létre, amelyeken belül panaszokat vagy kérdéseket küldhet be. A rendszer a beérkezett üzeneteket előfeldolgozza, szabályalapú döntést hoz, elkészíti a válasz tervét, majd konfiguráció alapján template-alapú vagy LLM-alapú választ generál.
 
----
-
-## Projekt hatóköre
-- Kizárólag UI és UX tervezés/implementáció.
-- Nincs backend integráció a jelenlegi fázisban.
-- Mintaadatok használata a prototípushoz és az UI validációhoz.
-- Az alkalmazás célja a chates panaszkezelés és a részletes audit infók megjelenítése.
+A UI elsődleges célja a beszélgetés egyszerű kezelése, valamint az egyes üzenetek feldolgozási folyamatának és eredményeinek részletes megtekintése.
 
 ---
 
-## Fő funkcionális követelmények
+# 1. Home Page
 
-### 1. Első oldal: Chat és előzmények
+A Home Page legyen az alkalmazás kezdőoldala.
 
-#### A) Korábbi chat előzmények listája
-- A bal oldalon vagy bal felső panelben listázódik a korábbi beszélgetések.
-- A chat history item esetén elegendő a rövid summary megjelenítése.
-- A lista általában szűrhető vagy rendezhető lehet.
-- Kattintásra a felhasználó megnyithatja az adott beszélgetés teljes kontextusát.
-- A további metaadatok opcionálisak lehetnek, de nem kötelezőek a fő listanézetben.
+### Tartalom
 
-#### B) Chatablak és beszélgetés megjelenítése
-- A chat középen jelenik meg, igazítva a layout közepére.
-- A beszélgetésben a felhasználó kérdései és az AI válaszai különíthetők el.
-- A jobb oldalon jelenjenek meg a felhasználói kérdések.
-- A bal oldalon jelenjenek meg a felhasználó válaszai / állapotok.
-- A chat fölött legyen egy beviteli mező és egy küldés gomb.
-- Az AI válasz megjelenhet például külön mezőben, színekkel és ikonokkal elkülönítve.
-- A chat felület legyen olvasható, jól tagolt, mobil és desktop méretben is működő.
+Jelenjen meg:
 
-#### C) Beszélgetés folytathatósága
-- Ha a felhasználó kiválaszt egy korábbi chat előzményt, a beszélgetés tovább folytatható.
-- A kiválasztott előzmény betöltődik, és a felhasználó új üzenetet küldhet hozzá.
-- Fontos, hogy az előzmények ne csak „read-only” listaként jelenjenek meg, hanem kontextusban működjenek.
+* az alkalmazás neve
+* a korábbi beszélgetések listája
+* minden beszélgetésnél:
 
-#### D) Chat details button
-- A chat panelben legyen egy „Chat details” vagy hasonló gomb.
-- E gomb nyomására navigáljon a felhasználó a második oldalra.
-- A navigáció legyen egyértelmű és közvetlen, a teljes beszélgetés kontextusával.
+  * cím
+  * státusz
+  * létrehozás dátuma
+* "New Conversation" / "Add" gomb
+* "Configurations" navigációs lehetőség
 
-#### E) Modell és verzió kiválasztása
-- A chat felett vagy a toolbarban legyen dropdown menü a modell kiválasztására.
-- Példák:
-  - chatgpt
-  - claude
-  - gemini
-- Továbbá legyen verzió dropdown is:
-  - gpt-4.3
-  - gpt-4o
-  - o3-mini
-  - stb.
-- A megjelenített modell-választásnak nyomon követhetőnek kell lennie a beszélgetés részleteinél is.
+### API
 
----
+Az oldal betöltésekor:
 
-### 2. Második oldal: Chat details / Audit panel
+`GET /api/conversations`
 
-#### A) Header
-- A headerben legyen látható a szöveg: „Chat Details” vagy magyarul: „Chat adatok / Chat details”.
-- A header legyen egyszerű, strukturált és jól elválasztva a tartalmaktól.
+Egy beszélgetés kiválasztásakor:
 
-#### B) Dropdown a részletek kiválasztásához
-- A felhasználó válasszon ki egy konkrét chat válaszhoz tartozó detailet.
-- Példák:
-  - 1
-  - 2
-  - 3
-  - 4
-  - 5
-- A dropdown alapján a rendszer módosítja a detail panel tartalmát.
-- A kiválasztott elemhez tartozó audit és prompt adatok jelenjenek meg.
+`GET /api/conversations/{id}`
 
-#### C) Előfeldolgozó modul eredménye
-- Egy nem szerkeszthető textarea mezőben jelenjen meg az előfeldolgozó modul kimenete.
-- Ezen belül szerepelnie kell:
-  - a tisztított szöveg
-  - a kategória
-  - az átfogalmazott prompt, amelyet az LLM-nek elküldünk
-- A textarea legyen read-only, nem szerkeszthető.
-- A felhasználó itt csak megtekintésre tudja használni.
+### Workflow
 
-#### D) Alkalmazott szabály megjelenítése
-- Jelenítsük meg azokat a szabályokat, amelyeket a rendszer alkalmaz az adatok védelmére.
-- Példa:
-  - „Tóth Jakab vagyok, az egyenlegem 100000000 Ft, és 50 Ft kamatot kaptam. Miért nem 100 Ft-ot?”
-- A rendszerben legyen rögzített leírás, hogy a név személyes adat, ezért nem küldhető tovább az LLM felé.
-- A UI-nak meg kell jelenítenie ezt a szabályt: például:
-  - „A név személyes adat; nem küldjük tovább az LLM számára.”
-- Ez a funkció fontos az auditálhatóság miatt: a felhasználó láthassa, mi került szűrésre vagy módosításra.
+Home Page
+→ beszélgetés kiválasztása
+→ Conversation Page
 
-#### E) LLM felé küldött prompt megjelenítése
-- Jelenjen meg az az utolsó prompt, amit ténylegesen az LLM felé küldünk.
-- Példa:
-  - „00000000 Ft, és 50 Ft kamatot kaptam. Miért nem 100 Ft-ot?”
-- Ez azt mutatja, hogy a személyes adat (név) kiszűrésre került a promptből.
-- A felületnek itt is auditálható, ellenőrizhető formában kell megjeleníteni.
+Az "Add" gomb megnyomásakor egy modal jelenjen meg, amelyben a felhasználó megadhatja az új beszélgetés címét.
+
+Mentés:
+
+`POST /api/conversations`
+
+Request:
+
+```json
+{
+  "title": "Fejhallgató reklamáció"
+}
+```
+
+Sikeres létrehozás után a felhasználó kerüljön az új Conversation Page-re.
 
 ---
 
-## UX és UI alapelvek
-- Minimalista, tisztán olvasható és professzionális felület.
-- Középre igazított chat panel és strukturált oldalelrendezés.
-- Külön színsémával jelölhető a felhasználói kérés és az AI válasz.
-- A részletes audit oldal legyen információs, nem interaktív, a felhasználó elsősorban ellenőrzésre használja.
-- A rendszer legyen biztonságos, nyomon követhető és szabályvezérelt.
+# 2. Conversation / Chat Page
+
+Ez legyen az alkalmazás fő chat felülete.
+
+### Tartalom
+
+A képernyőn jelenjen meg:
+
+* beszélgetés címe
+* korábbi üzenetek
+* user és system üzenetek különböző megjelenítéssel
+* szöveges input mező
+* Send gomb
+* configuration dropdown
+
+A configuration dropdown tartalmazza az összes elérhető konfigurációt.
+
+Az adatokat:
+
+`GET /api/configurations`
+
+végponttal kell lekérni.
+
+### Üzenet küldése
+
+A felhasználó kiválaszt egy konfigurációt, beírja az üzenetet, majd elküldi.
+
+Endpoint:
+
+`POST /api/conversations/{conversationId}/messages`
+
+Request:
+
+```json
+{
+  "content": "A múlt héten vásárolt fejhallgatóm elromlott. Szeretném visszakapni a pénzem.",
+  "configurationId": 2
+}
+```
+
+A response:
+
+```json
+{
+  "processingRunId": 501,
+  "messageId": 101,
+  "status": "Completed",
+  "createdAt": "2026-09-27T14:20:00Z"
+}
+```
+
+A rendszer válasza jelenjen meg a chatben.
+
+### Message → Details
+
+A user által küldött üzenetek legyenek kattinthatók.
+
+Egy üzenetre kattintva a felhasználó kerüljön a Message Details oldalra.
+
+A kiválasztott üzenethez tartozó `processingRunId` alapján töltsük be a feldolgozási eredményeket.
 
 ---
 
-## Adatmodell és UI-állapotok
-A frontend elképzelhető egyfajta mockadat modell szerint:
+# 3. Message Details Page
 
-- ChatHistoryItem
-  - id
-  - summary
-  - createdAt
-  - status
-  - messages[]
+Ez az oldal egy konkrét user message teljes feldolgozási folyamatát mutassa be.
 
-A chat history listában a felhasználó számára elegendő csak a summary megjelenítése; a title, illetve a többi metaadat opcionális információként kezelhető.
+A cél az, hogy a felhasználó egy helyen lássa, hogyan dolgozta fel a rendszer az üzenetet.
 
-- ChatMessage
-  - id
-  - sender: 'user' | 'ai'
-  - content
-  - timestamp
+Az oldal lehetőleg jól elkülönített szekciókból vagy accordion/tab elemekből álljon.
 
-- ChatDetailView
-  - selectedResponseId
-  - preprocessedText
-  - category
-  - rewrittenPrompt
-  - appliedRules[]
-  - finalPromptToLLM
-  - modelName
-  - modelVersion
+## 3.1. Original Message
 
-Ez a struktúra támogatja a listázást, a beszélgetés részleteit és az audit oldal logikáját.
+Felül jelenjen meg:
+
+* eredeti user message
+* message ID
+* processing run ID
+* használt configuration
 
 ---
 
-## Funkcionális elfogadási kritériumok
-1. A felhasználó lát egy korábbi chatelési előzmény listát.
-2. A chat panel középen jelenik meg, és tartalmazza a korábbi és új üzeneteket.
-3. A felhasználó tud írni egy új üzenetet és elküldeni.
-4. A beszélgetés kiválasztott előzménye alapján folytatható.
-5. A chat details gomb navigál a részletes nézetre.
-6. A második oldalon a felhasználó dropdownből választhat detailet.
-7. A textarea csak olvasható, tartalmazza az előfeldolgozott szöveget és promptet.
-8. A rendszer explicit módon megjeleníti a védett/eltávolított adatokat és a szabályokat.
-9. A végső prompt a felhasználó számára ellenőrizhető formában jelenik meg.
-10. A modell és verzió kiválasztása egyértelműen látszik a felületen.
+## 3.2. Preprocessing
+
+Endpoint:
+
+`GET /api/processing-runs/{id}/preprocessing`
+
+Jelenjen meg:
+
+* cleaned text
+* case type
+* structured case state
+
+Példa:
+
+```json
+{
+  "cleanedText": "A múlt héten vásárolt fejhallgatóm elromlott.",
+  "caseType": "RefundRequest",
+  "structuredCaseState": {
+    "product": "Fejhallgató",
+    "issue": "Defective",
+    "requestedAction": "Refund"
+  }
+}
+```
+
+A structured case state legyen jól olvasható kulcs-érték formában.
 
 ---
 
-## Technikai és implementációs megjegyzések
-- A projekt Angular frontend alapokra épül.
-- A layoutet komponensalapú felépítésben kell megvalósítani.
-- A navigáció a routeren keresztül történhet.
-- A UI-hoz mock adatokkal kell dolgozni, mert jelenleg nincs backend.
-- Az audit panelben a read-only textarea és a külön szakaszok (szabály, prompt, előfeldolgozás) segítik a láthatóságot.
-- A design és a UX célja az auditálhatóság és a nyomon követhetőség biztosítása, nem csak a chates felület látványossága.
+## 3.3. Rule Engine
+
+Endpoint:
+
+`GET /api/processing-runs/{id}/rules`
+
+Jelenjen meg:
+
+* decision
+* reason
+* rule set version
+* matched rules
+
+A matched rules legyenek egy jól áttekinthető listában vagy táblázatban.
+
+Minden szabálynál jelenjen meg:
+
+* rule code
+* matched status
+* reason
 
 ---
 
-## Javasolt felület felépítése
+## 3.4. Response Plan
 
-### 1. oldal
-- bal oldali panel: chat előzmények
-- középső panel: chat ablak + input mező + model selector
-- jobb oldali panel: kérdések / kontextus / összegzés
-- footer vagy toolbar: Chat details gomb
+Endpoint:
 
-### 2. oldal
-- header: Chat Details
-- felső rész: dropdown a válasz kiválasztására
-- fő tartalom:
-  - Preprocessor output textarea
-  - Applied rules section
-  - Final LLM prompt section
+`GET /api/processing-runs/{id}/response-plan`
 
----
+Jelenjen meg:
 
-## Példa feltöltött adat
-Példa a kontextusra:
+* decision
+* reason
+* required elements
+* response structure
+* sources
 
-Input:
-„Tóth Jakab vagyok, az egyenlegem 100000000 Ft, és 50 Ft kamatot kaptam. Miért nem 100 Ft-ot?”
-
-Szabály:
-- A név személyes adat.
-- A név nem küldhető tovább a model felé.
-
-Előfeldolgozott / tisztított szöveg:
-„Az egyenlegem 100000000 Ft, és 50 Ft kamatot kaptam. Miért nem 100 Ft-ot?”
-
-LLM prompt:
-„Az egyenlegem 100000000 Ft, és 50 Ft kamatot kaptam. Miért nem 100 Ft-ot?”
-
-Ez a példaminta a UI által megjelenítendő auditfolyam lényegét mutatja.
+A response structure lehet vizuálisan egy lépéssor vagy lista.
 
 ---
 
-## Összefoglalás
-Ez a projekt a szabályvezérelt, auditálható és AI támogatott panaszkezelés front-end felületére fókuszál. A UI célja, hogy a felhasználó hozzáférjen a beszélgetéshez, a korábbi előzményekhez, az AI válaszokhoz és a részletes szabály- és prompt szintekhez anélkül, hogy elveszne a nyomon követhetőség és a biztonsági logika.
+## 3.5. Generated Response
+
+A konfiguráció alapján csak a megfelelő response endpointot hívd meg.
+
+### Template esetén:
+
+`GET /api/processing-runs/{id}/response/template`
+
+Jelenjen meg:
+
+* generation mode
+* generated response
+* template version
+* processing time
+
+### LLM esetén:
+
+`GET /api/processing-runs/{id}/response/llm`
+
+Jelenjen meg:
+
+* generation mode
+* generated response
+* prompt version
+* model name
+* model parameters
+* processing time
+
+Az LLM response esetében a model parameters legyen összecsukható részben megjeleníthető.
+
+---
+
+# 4. Configuration Page
+
+Külön oldal legyen a konfigurációk kezelésére.
+
+A Home Page-ről legyen elérhető.
+
+### Tartalom
+
+Jelenjen meg:
+
+* konfigurációk listája
+* konfiguráció neve
+* konfiguráció típusa
+* "Add Configuration" gomb
+
+Endpoint:
+
+`GET /api/configurations`
+
+Példa:
+
+```json
+[
+  {
+    "id": 1,
+    "name": "Template Configuration"
+  },
+  {
+    "id": 2,
+    "name": "LLM Configuration"
+  }
+]
+```
+
+Egy konfigurációra kattintva jelenjenek meg a részletei.
+
+Endpoint:
+
+`GET /api/configurations/{id}`
+
+---
+
+# 5. Configuration Details
+
+A kiválasztott konfiguráció részletes adatai jelenjenek meg.
+
+Például LLM konfiguráció esetén:
+
+* name
+* rule set version
+* generation mode
+* prompt version
+* model name
+* model parameters
+
+Az adatokat:
+
+`GET /api/configurations/{id}`
+
+endpoint segítségével kell betölteni.
+
+---
+
+# 6. Create Configuration Page
+
+A Configuration Page-en található "Add Configuration" gomb egy új konfiguráció létrehozására szolgáló oldalra navigáljon.
+
+Elsőként a felhasználó válassza ki:
+
+* Template
+* LLM
+
+A kiválasztott típustól függően jelenjenek meg a releváns mezők.
+
+## Template configuration
+
+Mezők:
+
+* name
+* ruleSetVersion
+* templateVersion
+
+Mentés:
+
+`POST /api/configurations/template`
+
+Request:
+
+```json
+{
+  "name": "Template Configuration",
+  "ruleSetVersion": "1.0",
+  "templateVersion": "1.0"
+}
+```
+
+## LLM configuration
+
+Mezők:
+
+* name
+* ruleSetVersion
+* promptVersion
+* modelName
+* temperature
+* maxTokens
+
+Mentés:
+
+`POST /api/configurations/llm`
+
+Request:
+
+```json
+{
+  "name": "LLM Configuration",
+  "ruleSetVersion": "1.0",
+  "promptVersion": "2.0",
+  "modelName": "Llama-3",
+  "modelParameters": {
+    "temperature": 0.2,
+    "maxTokens": 500
+  }
+}
+```
+
+---
+
+# Navigáció
+
+A fő navigáció legyen egyszerű és egyértelmű:
+
+Home
+├── Conversation
+│   └── Message Details
+│
+└── Configurations
+├── Configuration Details
+└── Create Configuration
+
+---
+
+# UI/UX követelmények
+
+A design legyen:
+
+* modern
+* letisztult
+* professzionális
+* könnyen áttekinthető
+* desktop-first, de legyen responsive
+* ne legyen túlzsúfolt
+* használjon jól elkülönített cardokat/sectionöket
+* az API-ból érkező technikai információk legyenek könnyen értelmezhetők
+
+A Message Details oldal legyen különösen jól strukturált, mivel ezen az oldalon a teljes feldolgozási pipeline látható:
+
+User Message
+→ Preprocessing
+→ Rule Engine
+→ Response Plan
+→ Response Generation
+→ Final Response
+
+A feldolgozási lépések vizuálisan is jelenjenek meg, például stepper, timeline, accordion vagy egymás alatti cardok segítségével.
+
+A rendszer hibáit a UI jól látható, de felhasználóbarát módon kezelje.
+
+Példák:
+
+* 400 Bad Request → validációs hiba jelenjen meg
+* 404 Not Found → jelezze, hogy az adott erőforrás nem található
+* 500 Internal Server Error → általános rendszerhiba
+* 504 Gateway Timeout → jelezze, hogy az AI szolgáltatás nem válaszolt időben
+
+Ne használj feleslegesen bonyolult UI-elemeket. A cél egy jól használható, egyetemi/projekt környezetben is könnyen implementálható felület.
+
+Az API endpointokat ne módosítsd, hanem a fenti backend szerződéshez igazítsd a UI-t.
