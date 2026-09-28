@@ -1,54 +1,6 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
-
-interface RuleMatch {
-  code: string;
-  matched: boolean;
-  reason: string;
-}
-
-interface StructuredCaseState {
-  product: string;
-  issue: string;
-  requestedAction: string;
-}
-
-interface DetailEntry {
-  messageId: string;
-  messageTitle: string;
-  originalMessage: string;
-  processingRunId: number;
-  configurationName: string;
-  configurationType: 'template' | 'llm';
-  summary: string;
-  preprocessing: {
-    cleanedText: string;
-    caseType: string;
-    structuredCaseState: StructuredCaseState;
-  };
-  rules: {
-    decision: string;
-    reason: string;
-    ruleSetVersion: string;
-    matchedRules: RuleMatch[];
-  };
-  responsePlan: {
-    decision: string;
-    reason: string;
-    requiredElements: string[];
-    responseStructure: string[];
-    sources: string[];
-  };
-  generatedResponse: {
-    generationMode: 'template' | 'llm';
-    generatedResponse: string;
-    templateVersion?: string;
-    promptVersion?: string;
-    modelName?: string;
-    modelParameters?: Record<string, string | number | boolean>;
-    processingTime: string;
-  };
-}
+import { DetailEntry, DetailsService } from './details.service';
 
 @Component({
   selector: 'app-details-page',
@@ -308,170 +260,68 @@ interface DetailEntry {
 export class DetailsPageComponent {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
+  private readonly detailsService = inject(DetailsService);
 
-  protected readonly conversationId = signal(this.route.snapshot.paramMap.get('conversationId') ?? this.route.snapshot.queryParamMap.get('chatId') ?? '1');
+  protected readonly conversationId = signal(this.route.snapshot.paramMap.get('conversationId') ?? this.route.snapshot.queryParamMap.get('chatId') ?? 'conv-101');
   protected readonly messageId = signal(this.route.snapshot.paramMap.get('messageId') ?? this.route.snapshot.queryParamMap.get('messageId') ?? 'message-1');
   protected readonly chatTitle = signal(this.route.snapshot.queryParamMap.get('chatTitle') ?? 'Details');
 
-  protected readonly visibleEntries = signal<DetailEntry[]>(this.getVisibleEntriesForChat(this.conversationId()));
-  protected readonly selectedDetailTitle = signal(
-    this.visibleEntries().find((entry) => entry.messageId === this.messageId())?.messageTitle ?? this.visibleEntries()[0]?.messageTitle ?? 'Details',
-  );
+  protected readonly visibleEntries = signal<DetailEntry[]>([]);
+
+  protected readonly selectedDetailTitle = signal('Details');
   protected readonly selectedDetail = computed(() => {
     return (
       this.visibleEntries().find((entry) => entry.messageId === this.messageId()) ??
-      this.visibleEntries().find((entry) => entry.messageTitle === this.selectedDetailTitle()) ??
-      this.visibleEntries()[0]
+      this.visibleEntries()[0] ??
+      ({
+        messageId: '',
+        messageTitle: 'Nincs elérhető részlet',
+        originalMessage: '',
+        processingRunId: 0,
+        configurationName: '',
+        configurationType: 'template',
+        summary: '',
+        preprocessing: {
+          cleanedText: '',
+          caseType: '',
+          structuredCaseState: { product: '', issue: '', requestedAction: '' },
+        },
+        rules: {
+          decision: '',
+          reason: '',
+          ruleSetVersion: '',
+          matchedRules: [],
+        },
+        responsePlan: {
+          decision: '',
+          reason: '',
+          requiredElements: [],
+          responseStructure: [],
+          sources: [],
+        },
+        generatedResponse: {
+          generationMode: 'template',
+          generatedResponse: '',
+          processingTime: '',
+        },
+      } as DetailEntry)
     );
   });
+
+  constructor() {
+    this.detailsService.loadDetailsForConversation(this.conversationId()).subscribe((items) => {
+      this.visibleEntries.set(items);
+      const selected = items.find((entry) => entry.messageId === this.messageId()) ?? items[0];
+      if (selected) {
+        this.selectedDetailTitle.set(selected.messageTitle);
+      }
+    });
+  }
 
   protected readonly objectEntries = <T extends object>(source: T): [string, string | number | boolean][] =>
     Object.entries(source as Record<string, unknown>).map(([key, value]) => [key, String(value) as string]);
 
   protected goBack(): void {
     this.router.navigate(['/conversation', this.conversationId()]);
-  }
-
-  private getVisibleEntriesForChat(chatId: string): DetailEntry[] {
-    const entriesByChat: Record<string, DetailEntry[]> = {
-      'conv-101': [
-        {
-          messageId: 'message-1',
-          messageTitle: 'A múlt héten vásárolt fejhallgatóm hibásan működik. Szeretném visszakapni a pénzem.',
-          originalMessage: 'A múlt héten vásárolt fejhallgatóm elromlott. Szeretném visszakapni a pénzem.',
-          processingRunId: 501,
-          configurationName: 'Refund policy template',
-          configurationType: 'template',
-          summary: 'A felhasználó fejhallgató meghibásodására hivatkozva pénzvisszatérítést kér.',
-          preprocessing: {
-            cleanedText: 'A múlt héten vásárolt fejhallgatóm elromlott.',
-            caseType: 'RefundRequest',
-            structuredCaseState: {
-              product: 'Fejhallgató',
-              issue: 'Defective',
-              requestedAction: 'Refund',
-            },
-          },
-          rules: {
-            decision: 'Approved',
-            reason: 'A termék hibás és a vásárló a teljes összeg visszatérítésére jogosult.',
-            ruleSetVersion: 'refund-v3.2',
-            matchedRules: [
-              { code: 'REF-101', matched: true, reason: 'A termék hibásnak minősül.' },
-              { code: 'REF-204', matched: true, reason: 'A visszatérítés kérelme teljes mértékben érvényes.' },
-              { code: 'PRV-011', matched: true, reason: 'Személyes adatok eltávolítása megtörtént.' },
-            ],
-          },
-          responsePlan: {
-            decision: 'Issue refund',
-            reason: 'A kártyás fizetéshez igazított, dokumentált hiba miatt a visszatérítés folytatható.',
-            requiredElements: ['Hiba leírása', 'Vásárlás dátuma', 'Termék azonosító', 'Fizetési adatok'],
-            responseStructure: ['Bevezetés', 'A hiba összefoglalása', 'A visszatérítés jogosságának magyarázata', 'Következő lépések'],
-            sources: ['Receiptt', 'Termék garancia', 'Vásárlói nyilatkozat'],
-          },
-          generatedResponse: {
-            generationMode: 'template',
-            generatedResponse: 'Kedves Vásárló, a bejelentett hibát ellenőriztük. A termék hibásnak minősült, ezért a teljes összeg visszatérítésére jogosult. A következő lépésekben elküldjük a visszatérítési végrehajtás részleteit.',
-            templateVersion: 'customer-refund-v2',
-            processingTime: '480 ms',
-          },
-        },
-      ],
-      'conv-102': [
-        {
-          messageId: 'message-3',
-          messageTitle: 'A számlakivonatom nem mutatja a teljes kamatösszeget.',
-          originalMessage: 'A számlakivonatom nem mutatja a teljes kamatösszeget.',
-          processingRunId: 502,
-          configurationName: 'LLM compliance review',
-          configurationType: 'llm',
-          summary: 'A felhasználó a számlakivonat kamatadatai között eltérést észlel.',
-          preprocessing: {
-            cleanedText: 'A számlakivonatból hiányzik a teljes kamatösszeg.',
-            caseType: 'BillingDiscrepancy',
-            structuredCaseState: {
-              product: 'Számlakivonat',
-              issue: 'Missing interest',
-              requestedAction: 'Clarification',
-            },
-          },
-          rules: {
-            decision: 'Needs review',
-            reason: 'A hiányzó kamatérték ellenőrzése szükséges a banki tranzakciók és letéti adatok között.',
-            ruleSetVersion: 'billing-v5.1',
-            matchedRules: [
-              { code: 'BILL-202', matched: true, reason: 'A számlakivonat hiányos lehet.' },
-              { code: 'BILL-305', matched: false, reason: 'Nincs azonnali pénzügyi kockázat.' },
-              { code: 'PRV-015', matched: true, reason: 'Személyes adat elkülönítés végrehajtva.' },
-            ],
-          },
-          responsePlan: {
-            decision: 'Investigate account entries',
-            reason: 'A kamatérték ellenőrzéséhez a banki tranzakciók összehasonlítása szükséges.',
-            requiredElements: ['Tranzakciók', 'Kamatkalkuláció', 'Számlatörténet', 'Jóváírások'],
-            responseStructure: ['A probléma összefoglalása', 'Állapotértékelés', 'További ellenőrzés', 'Megoldási javaslat'],
-            sources: ['Banki kivonat', 'Számlatörténet', 'Fizetési nyilvántartás'],
-          },
-          generatedResponse: {
-            generationMode: 'llm',
-            generatedResponse: 'A számlakivonat alapján a kamatérték hiányzik. A következő lépésben a banki tranzakciók összevetését végezzük el, hogy pontosan azonosítsuk a hiányzó összeget.',
-            promptVersion: 'billing-audit-v4',
-            modelName: 'gpt-4.1-mini',
-            modelParameters: {
-              temperature: 0.2,
-              maxTokens: 800,
-              topP: 0.9,
-              responseFormat: 'plain-text',
-            },
-            processingTime: '1.1 s',
-          },
-        },
-      ],
-      'conv-103': [
-        {
-          messageId: 'message-5',
-          messageTitle: 'Kérném a termék cseréjét és a visszatérítést.',
-          originalMessage: 'Kérném a termék cseréjét és a visszatérítést.',
-          processingRunId: 503,
-          configurationName: 'Exchange and refund policy',
-          configurationType: 'template',
-          summary: 'A felhasználó termékcsere és pénzvisszatérítés iránti kérelmet nyújt be.',
-          preprocessing: {
-            cleanedText: 'Termékcsere és pénzvisszatérítés kérés.',
-            caseType: 'ReturnAndExchangeRequest',
-            structuredCaseState: {
-              product: 'Termék',
-              issue: 'Replacement and refund',
-              requestedAction: 'Exchange or refund',
-            },
-          },
-          rules: {
-            decision: 'Partial approval',
-            reason: 'A cserére vonatkozó kérelem elfogadható, a teljes refund pedig a feltételek függvényében értékelendő.',
-            ruleSetVersion: 'returns-v4.0',
-            matchedRules: [
-              { code: 'RET-110', matched: true, reason: 'A csere kérelem érvényes.' },
-              { code: 'RET-221', matched: true, reason: 'A refund feltételei részben teljesülnek.' },
-              { code: 'PRV-009', matched: true, reason: 'Személyes adatokat kizártuk a feldolgozásból.' },
-            ],
-          },
-          responsePlan: {
-            decision: 'Offer exchange with review',
-            reason: 'A csere prioritása magasabb, mint a teljes refund, de a végső döntéshez a termék állapota szükséges.',
-            requiredElements: ['Termék állapota', 'Garancia adatok', 'Vásárlás dátuma', 'Pénzvisszatérítés lehetősége'],
-            responseStructure: ['A kérelem összefoglalása', 'Csere lehetősége', 'Refund értékelés', 'Végső döntés'],
-            sources: ['Visszaküldési feltételek', 'Garancia adatok', 'Vásárlói profil'],
-          },
-          generatedResponse: {
-            generationMode: 'template',
-            generatedResponse: 'A kérelmet elfogadtuk. Először a termék cseréjének lehetőségét vizsgáljuk meg, és a visszatérítésre vonatkozó döntést a termékállapot és a határidő alapján fogjuk meghozni.',
-            templateVersion: 'exchange-review-v1',
-            processingTime: '620 ms',
-          },
-        },
-      ],
-    };
-
-    return entriesByChat[chatId] ?? entriesByChat['conv-101'];
   }
 }
