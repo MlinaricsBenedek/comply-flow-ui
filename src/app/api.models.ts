@@ -53,6 +53,36 @@ export interface MessageResponse {
   createdAt: string;
 }
 
+export interface ConversationRequestMessageResponse {
+  id: number;
+  content: string | null;
+  createdAt: string;
+}
+
+export interface ConversationGeneratedMessageResponse {
+  content: string | null;
+  generationMode: string | null;
+  createdAt: string | null;
+}
+
+export interface ConversationMessageErrorResponse {
+  type: string | null;
+  message: string | null;
+}
+
+export interface ConversationExchangeResponse {
+  processingId: number;
+  status: string | null;
+  request: ConversationRequestMessageResponse | null;
+  response: ConversationGeneratedMessageResponse | null;
+  error: ConversationMessageErrorResponse | null;
+}
+
+export interface ConversationMessagesResponse {
+  conversationId: number;
+  messages: ConversationExchangeResponse[] | null;
+}
+
 export interface EvaluationResultResponse {
   metric: string | null;
   score: number;

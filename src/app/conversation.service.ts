@@ -3,6 +3,7 @@ import { Injectable, PLATFORM_ID, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import {
   ConversationResponse,
+  ConversationMessagesResponse,
   MessageResponse,
   ProcessingResultResponse,
   RequestConversation,
@@ -25,8 +26,8 @@ export class ConversationService {
     );
   }
 
-  getConversationMessages(conversationId: number): Observable<MessageResponse[]> {
-    return this.http.get<MessageResponse[]>(
+  getConversationMessages(conversationId: number): Observable<ConversationMessagesResponse> {
+    return this.http.get<ConversationMessagesResponse>(
       `${this.apiBaseUrl}/conversations/${conversationId}/messages`,
     );
   }

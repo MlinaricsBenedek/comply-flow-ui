@@ -313,18 +313,39 @@ export class ConversationPageComponent implements OnInit {
       .subscribe({
         next: (messages) => {
           this.messages.set(
-            [...messages]
+            [...(messages.messages ?? [])]
               .sort(
                 (left, right) =>
-                  new Date(left.createdAt).getTime() - new Date(right.createdAt).getTime(),
+                  new Date(left.request?.createdAt ?? 0).getTime() -
+                  new Date(right.request?.createdAt ?? 0).getTime(),
               )
-              .map((message) => ({
-                key: `message-${message.id}`,
-                sender: message.role.toLowerCase() === 'user' ? 'user' : 'system',
-                content: message.content,
-                timestamp: this.formatTimestamp(message.createdAt),
-                ...(message.processingId > 0 ? { processingId: message.processingId } : {}),
-              })),
+              .flatMap((exchange) => {
+                const chatMessages: ChatMessage[] = [];
+                if (exchange.request) {
+                  chatMessages.push({
+                    key: `request-${exchange.request.id}`,
+                    sender: 'user',
+                    content: exchange.request.content ?? '',
+                    timestamp: this.formatTimestamp(exchange.request.createdAt),
+                  });
+                }
+
+                const responseContent =
+                  exchange.response?.content ??
+                  exchange.error?.message ??
+                  exchange.status ??
+                  'No response available.';
+                chatMessages.push({
+                  key: `response-${exchange.processingId}`,
+                  sender: 'system',
+                  content: responseContent,
+                  timestamp: this.formatTimestamp(
+                    exchange.response?.createdAt ?? exchange.request?.createdAt ?? '',
+                  ),
+                  ...(exchange.processingId > 0 ? { processingId: exchange.processingId } : {}),
+                });
+                return chatMessages;
+              }),
           );
           this.loadingMessages.set(false);
         },
