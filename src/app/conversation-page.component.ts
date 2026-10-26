@@ -1,11 +1,22 @@
-import { Component, inject, signal } from '@angular/core';
-import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { Component, DestroyRef, OnInit, computed, inject, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { ActivatedRoute, RouterLink } from '@angular/router';
+import { EMPTY, catchError, switchMap, takeWhile, timer } from 'rxjs';
+import {
+  ConfigurationSummaryResponse,
+  ConversationResponse,
+  MessageResponse,
+  ProcessingResultResponse,
+} from './api.models';
+import { ConfigurationService } from './configuration.service';
+import { ConversationService } from './conversation.service';
 
 interface ChatMessage {
-  id: string;
+  key: string;
   sender: 'user' | 'system';
   content: string;
   timestamp: string;
+  processingId?: number;
 }
 
 @Component({
@@ -26,32 +37,68 @@ interface ChatMessage {
           <div class="header-actions">
             <label class="field-group compact">
               <span>Configuration</span>
-              <select [value]="selectedConfiguration()" (change)="selectedConfiguration.set($any($event.target).value)">
-                @for (option of configurationOptions; track option) {
-                  <option [value]="option">{{ option }}</option>
+              <select
+                [value]="selectedConfigurationId() ?? ''"
+                (change)="selectConfiguration($event)"
+                [disabled]="loadingConfigurations() || configurations().length === 0"
+              >
+                @for (configuration of configurations(); track configuration.id) {
+                  <option [value]="configuration.id">
+                    {{ configuration.name ?? 'Unnamed configuration' }} (#{{ configuration.id }})
+                  </option>
                 }
               </select>
             </label>
           </div>
         </header>
 
+        @if (errorMessage()) {
+          <p class="error-message" role="alert">{{ errorMessage() }}</p>
+        }
+        @if (configurationError()) {
+          <p class="error-message" role="alert">{{ configurationError() }}</p>
+        }
+        @if (loadingConversation()) {
+          <p class="status-message">Loading conversation…</p>
+        }
+        @if (loadingMessages()) {
+          <p class="status-message">Loading messages…</p>
+        }
+        @if (messagesError()) {
+          <p class="error-message" role="alert">{{ messagesError() }}</p>
+        }
+        @if (loadingConfigurations()) {
+          <p class="status-message">Loading configurations…</p>
+        } @else if (configurations().length === 0) {
+          <p class="error-message" role="alert">Create a configuration before sending a message.</p>
+        }
+
         <section class="chat-panel">
           <div class="chat-thread">
-            @for (message of messages(); track message.id) {
-              <div class="message-row" [class.user]="message.sender === 'user'" [class.system]="message.sender === 'system'">
-                @if (message.sender === 'system') {
-                  <button type="button" class="message-bubble clickable-message" (click)="openMessageDetails(message.id)" aria-label="Open message details">
-                    <span class="hover-label">details</span>
-                    <p>{{ message.content }}</p>
-                    <span>{{ message.timestamp }}</span>
-                  </button>
-                } @else {
-                  <div class="message-bubble">
-                    <p>{{ message.content }}</p>
-                    <span>{{ message.timestamp }}</span>
-                  </div>
-                }
+            @for (message of messages(); track message.key) {
+              <div
+                class="message-row"
+                [class.user]="message.sender === 'user'"
+                [class.system]="message.sender === 'system'"
+              >
+                <div class="message-bubble">
+                  <p>{{ message.content }}</p>
+                  <span>{{ message.timestamp }}</span>
+                  @if (message.processingId) {
+                    <a
+                      class="detail-link"
+                      [routerLink]="['/details', conversationId(), message.processingId]"
+                      [queryParams]="{ chatTitle: currentTitle() }"
+                    >
+                      View processing details #{{ message.processingId }}
+                    </a>
+                  }
+                </div>
               </div>
+            } @empty {
+              @if (!loadingConversation() && !loadingMessages() && !messagesError()) {
+                <p class="empty-thread">No messages yet. Send a message to start this conversation.</p>
+              }
             }
           </div>
 
@@ -61,12 +108,18 @@ interface ChatMessage {
               placeholder="Írd le a panasz szövegét..."
               [value]="draftMessage()"
               (input)="draftMessage.set($any($event.target).value)"
+              [disabled]="loadingConversation() || !conversationId()"
             ></textarea>
 
             <div class="composer-actions">
               <button type="button" class="secondary-button" [routerLink]="['/']">Cancel</button>
-              <button type="button" class="primary-button" (click)="sendMessage()" [disabled]="!draftMessage().trim()">
-                Send
+              <button
+                type="button"
+                class="primary-button"
+                (click)="sendMessage()"
+                [disabled]="!canSend() || isSending()"
+              >
+                {{ isSending() ? 'Sending…' : 'Send' }}
               </button>
             </div>
           </div>
@@ -89,7 +142,9 @@ interface ChatMessage {
     '.header-actions { display: flex; justify-content: flex-end; }',
     '.field-group { display: flex; flex-direction: column; gap: 8px; }',
     '.field-group span { font-size: 0.76rem; color: #475569; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; }',
-    '.field-group select { width: min(280px, 100%); padding: 0.9rem 1rem; border-radius: 12px; border: 1px solid #cbd5e1; background: #fff; color: #0f172a; font: inherit; }',
+    '.field-group select { width: min(320px, 100%); padding: 0.9rem 1rem; border-radius: 12px; border: 1px solid #cbd5e1; background: #fff; color: #0f172a; font: inherit; }',
+    '.status-message, .empty-thread { color: #64748b; line-height: 1.5; }',
+    '.error-message { margin: 12px 0; color: #b91c1c; line-height: 1.5; font-weight: 600; }',
     '.chat-panel { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 18px; padding: 18px; }',
     '.chat-thread { display: flex; flex-direction: column; gap: 14px; min-height: 350px; max-height: 58vh; overflow-y: auto; padding: 6px 2px 12px; }',
     '.message-row { display: flex; }',
@@ -98,11 +153,9 @@ interface ChatMessage {
     '.message-bubble { position: relative; max-width: min(72%, 620px); border-radius: 16px; padding: 12px 14px; box-shadow: 0 8px 22px rgba(15, 23, 42, 0.05); }',
     '.message-row.user .message-bubble { background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%); color: #ffffff; }',
     '.message-row.system .message-bubble { background: #eef2ff; color: #1e293b; }',
-    '.clickable-message { border: none; text-align: left; cursor: pointer; position: relative; }',
-    '.hover-label { position: absolute; right: 12px; top: 8px; font-size: 0.6rem; letter-spacing: 0.08em; text-transform: lowercase; opacity: 0; transition: opacity 0.2s ease; color: #1d4ed8; z-index: 1; }',
-    '.clickable-message:hover .hover-label, .clickable-message:focus-visible .hover-label { opacity: 1; }',
-    '.message-bubble p { margin: 18px 0 6px; line-height: 1.5; }',
-    '.message-bubble span { display: block; font-size: 0.7rem; opacity: 0.8; }',
+    '.message-bubble p { margin: 4px 0 6px; line-height: 1.5; white-space: pre-wrap; }',
+    '.message-bubble span { display: block; font-size: 0.7rem; opacity: 0.8; margin-top: 4px; }',
+    '.detail-link { display: inline-block; margin-top: 8px; color: inherit; font-size: 0.78rem; font-weight: 700; text-decoration: underline; text-underline-offset: 3px; }',
     '.composer { margin-top: 18px; border-top: 1px solid #e2e8f0; padding-top: 18px; }',
     '.composer textarea { width: 100%; box-sizing: border-box; resize: vertical; border-radius: 12px; border: 1px solid #cbd5e1; padding: 0.9rem 1rem; font: inherit; min-height: 90px; }',
     '.composer textarea:focus { outline: 2px solid #bfdbfe; border-color: #60a5fa; }',
@@ -110,110 +163,229 @@ interface ChatMessage {
     '@media (max-width: 640px) { .conversation-page { padding: 18px; } .conversation-shell { padding: 18px; } .conversation-header { flex-direction: column; align-items: flex-start; } .header-actions, .composer-actions { width: 100%; } .composer-actions { flex-direction: column; } .composer-actions .secondary-button, .composer-actions .primary-button { width: 100%; } }',
   ],
 })
-export class ConversationPageComponent {
+export class ConversationPageComponent implements OnInit {
   private readonly route = inject(ActivatedRoute);
-  private readonly router = inject(Router);
+  private readonly destroyRef = inject(DestroyRef);
+  private readonly conversationService = inject(ConversationService);
+  private readonly configurationService = inject(ConfigurationService);
 
-  protected readonly configurationOptions = ['Template Configuration', 'LLM Configuration'];
-  protected readonly selectedConfiguration = signal('Template Configuration');
+  protected readonly conversationId = signal<number | null>(null);
+  protected readonly conversation = signal<ConversationResponse | null>(null);
+  protected readonly currentTitle = computed(() => this.conversation()?.title ?? 'Conversation');
+  protected readonly configurations = signal<ConfigurationSummaryResponse[]>([]);
+  protected readonly selectedConfigurationId = signal<number | null>(null);
+  protected readonly messages = signal<ChatMessage[]>([]);
+  protected readonly loadingMessages = signal(true);
+  protected readonly messagesError = signal<string | null>(null);
   protected readonly draftMessage = signal('');
+  protected readonly loadingConversation = signal(true);
+  protected readonly loadingConfigurations = signal(true);
+  protected readonly isSending = signal(false);
+  protected readonly errorMessage = signal<string | null>(null);
+  protected readonly configurationError = signal<string | null>(null);
+  protected readonly canSend = computed(
+    () =>
+      !!this.conversationId() &&
+      !!this.selectedConfigurationId() &&
+      !!this.draftMessage().trim() &&
+      !this.loadingConversation(),
+  );
 
-  protected readonly conversationId = signal(this.route.snapshot.paramMap.get('id') ?? 'conv-101');
-  protected readonly currentTitle = signal(this.resolveTitle(this.conversationId()));
-  protected readonly messages = signal<ChatMessage[]>(this.getMessagesForConversation(this.conversationId()));
+  ngOnInit(): void {
+    this.route.paramMap
+      .pipe(
+        switchMap((params) => {
+          const rawId = params.get('id');
+          if (rawId === null) {
+            this.conversationId.set(null);
+            this.loadingConversation.set(false);
+            this.loadingMessages.set(false);
+            this.errorMessage.set(
+              'No conversation was selected. Create one from the conversation list.',
+            );
+            return EMPTY;
+          }
 
-  protected openMessageDetails(messageId: string): void {
-    this.router.navigate(['/details', this.conversationId(), messageId], {
-      queryParams: {
-        configurationName: this.selectedConfiguration(),
+          const id = Number(rawId);
+          if (!Number.isInteger(id) || id < 1) {
+            this.conversationId.set(null);
+            this.loadingConversation.set(false);
+            this.loadingMessages.set(false);
+            this.errorMessage.set('The conversation ID is invalid.');
+            return EMPTY;
+          }
+
+          this.conversationId.set(id);
+          this.conversation.set(null);
+          this.messages.set([]);
+          this.loadingMessages.set(true);
+          this.messagesError.set(null);
+          this.loadingConversation.set(true);
+          this.errorMessage.set(null);
+          return this.conversationService.getConversation(id).pipe(
+            catchError((error: unknown) => {
+              this.conversationId.set(null);
+              this.loadingConversation.set(false);
+              this.errorMessage.set(ConfigurationService.getErrorMessage(error));
+              return EMPTY;
+            }),
+          );
+        }),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe((conversation) => {
+        this.conversation.set(conversation);
+        this.loadingConversation.set(false);
+        this.loadConversationMessages(conversation.id);
+      });
+
+    this.configurationService.getConfigurations().subscribe({
+      next: (configurations) => {
+        this.configurations.set(configurations);
+        this.selectedConfigurationId.set(configurations[0]?.id ?? null);
+        this.loadingConfigurations.set(false);
+      },
+      error: (error: unknown) => {
+        this.loadingConfigurations.set(false);
+        this.configurationError.set(ConfigurationService.getErrorMessage(error));
       },
     });
   }
 
-  protected sendMessage(): void {
-    const text = this.draftMessage().trim();
+  protected selectConfiguration(event: Event): void {
+    const id = Number((event.target as HTMLSelectElement).value);
+    this.selectedConfigurationId.set(Number.isInteger(id) && id > 0 ? id : null);
+  }
 
-    if (!text) {
+  protected sendMessage(): void {
+    const conversationId = this.conversationId();
+    const configurationId = this.selectedConfigurationId();
+    const content = this.draftMessage().trim();
+    if (!conversationId || !configurationId || !content || this.isSending()) {
       return;
     }
 
-    const timestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    const next = [
-      ...this.messages(),
+    this.errorMessage.set(null);
+    this.isSending.set(true);
+    this.conversationService
+      .sendMessage(conversationId, { content, configurationId })
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (message) => {
+          this.isSending.set(false);
+          this.draftMessage.set('');
+          this.appendMessage(message);
+          this.watchProcessing(message.processingId);
+        },
+        error: (error: unknown) => {
+          this.isSending.set(false);
+          this.errorMessage.set(ConfigurationService.getErrorMessage(error));
+        },
+      });
+  }
+
+  private appendMessage(message: MessageResponse): void {
+    const timestamp = this.formatTimestamp(message.createdAt);
+    this.messages.update((messages) => [
+      ...messages,
       {
-        id: `${this.conversationId()}-${Date.now()}`,
-        sender: 'user' as const,
-        content: text,
+        key: `user-${message.id}`,
+        sender: 'user',
+        content: message.content,
         timestamp,
       },
       {
-        id: `message-${Date.now()}`,
-        sender: 'system' as const,
-        content: 'A rendszer a beérkező üzenetet előfeldolgozza és a releváns szabályok alapján továbbítja a feldolgozási folyamatnak.',
+        key: `processing-${message.processingId}`,
+        sender: 'system',
+        content: 'Processing has started.',
         timestamp,
+        processingId: message.processingId,
       },
-    ];
-
-    this.messages.set(next);
-    this.draftMessage.set('');
+    ]);
   }
 
-  private getMessagesForConversation(id: string): ChatMessage[] {
-    const dataset: Record<string, ChatMessage[]> = {
-      'conv-101': [
-        {
-          id: 'chat-1',
-          sender: 'user',
-          content: 'A múlt héten vásárolt fejhallgatóm hibásan működik. Szeretném visszakapni a pénzem.',
-          timestamp: '09:13',
+  private loadConversationMessages(conversationId: number): void {
+    this.loadingMessages.set(true);
+    this.messagesError.set(null);
+    this.conversationService
+      .getConversationMessages(conversationId)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (messages) => {
+          this.messages.set(
+            [...messages]
+              .sort(
+                (left, right) =>
+                  new Date(left.createdAt).getTime() - new Date(right.createdAt).getTime(),
+              )
+              .map((message) => ({
+                key: `message-${message.id}`,
+                sender: message.role.toLowerCase() === 'user' ? 'user' : 'system',
+                content: message.content,
+                timestamp: this.formatTimestamp(message.createdAt),
+                ...(message.processingId > 0 ? { processingId: message.processingId } : {}),
+              })),
+          );
+          this.loadingMessages.set(false);
         },
-        {
-          id: 'message-1',
-          sender: 'system',
-          content: 'A rendszer előfeldolgozta a panaszt, eltávolította a személyes adatokat és a refund kérelemre vonatkozó szabályokat alkalmazta.',
-          timestamp: '09:14',
+        error: (error: unknown) => {
+          this.loadingMessages.set(false);
+          this.messagesError.set(ConfigurationService.getErrorMessage(error));
         },
-      ],
-      'conv-102': [
-        {
-          id: 'chat-3',
-          sender: 'user',
-          content: 'A számlakivonatom nem mutatja a teljes kamatösszeget.',
-          timestamp: '08:45',
-        },
-        {
-          id: 'message-3',
-          sender: 'system',
-          content: 'A kérdésben szereplő adatok ellenőrzése megtörtént, a további lépés a banki tranzakciók összevetése.',
-          timestamp: '08:47',
-        },
-      ],
-      'conv-103': [
-        {
-          id: 'chat-5',
-          sender: 'user',
-          content: 'Kérném a termék cseréjét és a visszatérítést.',
-          timestamp: '08:03',
-        },
-        {
-          id: 'message-5',
-          sender: 'system',
-          content: 'A korábbi ügyben a kérés lezárult, a válasz ellenőrzés alatt áll.',
-          timestamp: '08:05',
-        },
-      ],
-    };
-
-    return dataset[id] ?? dataset['conv-101'];
+      });
   }
 
-  private resolveTitle(id: string): string {
-    const titles: Record<string, string> = {
-      'conv-101': 'Fejhallgató reklamáció',
-      'conv-102': 'Számlakivonat és kamatvitás',
-      'conv-103': 'Termékcsere kérése',
-    };
+  private watchProcessing(processingId: number): void {
+    let finished = false;
+    timer(0, 1500)
+      .pipe(
+        switchMap(() => this.conversationService.getProcessingResult(processingId)),
+        takeWhile((result, index) => !result.isFinished && index < 59, true),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe({
+        next: (result) => {
+          finished = result.isFinished;
+          this.updateProcessingMessage(processingId, result);
+        },
+        error: (error: unknown) => {
+          this.updateProcessingMessage(
+            processingId,
+            null,
+            ConfigurationService.getErrorMessage(error),
+          );
+        },
+        complete: () => {
+          if (!finished) {
+            this.updateProcessingMessage(
+              processingId,
+              null,
+              'Processing is still underway. Please check again later.',
+            );
+          }
+        },
+      });
+  }
 
-    return titles[id] ?? 'New conversation';
+  private updateProcessingMessage(
+    processingId: number,
+    result: ProcessingResultResponse | null,
+    errorMessage?: string,
+  ): void {
+    const responseText = result?.results?.response?.text?.trim();
+    const statusText = result?.error?.message ?? result?.availabilityMessage ?? result?.status;
+    const content = errorMessage ?? responseText ?? statusText ?? 'Processing is in progress…';
+    this.messages.update((messages) =>
+      messages.map((message) =>
+        message.processingId === processingId ? { ...message, content } : message,
+      ),
+    );
+  }
+
+  private formatTimestamp(value: string): string {
+    const parsed = new Date(value);
+    return Number.isNaN(parsed.getTime())
+      ? value
+      : parsed.toISOString().replace('T', ' ').slice(0, 16);
   }
 }

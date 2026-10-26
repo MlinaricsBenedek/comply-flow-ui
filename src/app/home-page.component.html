@@ -23,50 +23,63 @@
         </div>
 
         <div class="conversation-list">
+          @if (errorMessage()) {
+            <p class="error-message" role="alert">{{ errorMessage() }}</p>
+          }
+          @if (isLoading()) {
+            <p>Loading conversations…</p>
+          }
           @for (conversation of conversations(); track conversation.id) {
             <a
               class="conversation-card"
               [class.active]="selectedConversationId() === conversation.id"
               [routerLink]="['/conversation', conversation.id]"
-              (click)="openConversation(conversation.id)"
             >
               <div class="conversation-topline">
-                <span class="status-badge status-{{ conversation.statusKey }}">{{ conversation.status }}</span>
-                <span class="created-at">{{ conversation.createdAt }}</span>
+                <span class="status-badge status-{{ statusKey(conversation.status) }}">{{ conversation.status }}</span>
+                <span class="created-at">{{ formatDate(conversation.createdAt) }}</span>
               </div>
 
-              <h3>{{ conversation.title }}</h3>
-              <p>{{ conversation.summary }}</p>
+              <h3>{{ conversation.title ?? 'Untitled conversation' }}</h3>
+              <p>Conversation #{{ conversation.id }}</p>
             </a>
+          } @empty {
+            @if (!isLoading()) {
+              <p>No conversations found. Create one to get started.</p>
+            }
           }
         </div>
       </section>
 
       <aside class="overview-panel">
         <div class="summary-card">
-          <p class="eyebrow">Selected conversation</p>
-          <h3>{{ selectedConversation().title }}</h3>
+          @if (selectedConversation(); as selected) {
+            <p class="eyebrow">Selected conversation</p>
+            <h3>{{ selected.title ?? 'Untitled conversation' }}</h3>
 
-          <dl class="meta-list">
-            <div>
-              <dt>Status</dt>
-              <dd>{{ selectedConversation().status }}</dd>
-            </div>
-            <div>
-              <dt>Created</dt>
-              <dd>{{ selectedConversation().createdAt }}</dd>
-            </div>
-            <div>
-              <dt>Last update</dt>
-              <dd>{{ selectedConversation().updatedAt }}</dd>
-            </div>
-          </dl>
+            <dl class="meta-list">
+              <div>
+                <dt>Status</dt>
+                <dd>{{ selected.status ?? '—' }}</dd>
+              </div>
+              <div>
+                <dt>Created</dt>
+                <dd>{{ formatDate(selected.createdAt) }}</dd>
+              </div>
+              <div>
+                <dt>Conversation ID</dt>
+                <dd>{{ selected.id }}</dd>
+              </div>
+            </dl>
 
-          <p class="summary-copy">{{ selectedConversation().summary }}</p>
-
-          <a class="secondary-button full-width center-button" [routerLink]="['/conversation', selectedConversation().id]">
-            Open conversation
-          </a>
+            <a class="secondary-button full-width center-button" [routerLink]="['/conversation', selected.id]">
+              Open conversation
+            </a>
+          } @else {
+            <p class="eyebrow">Conversations</p>
+            <h3>No conversation selected</h3>
+            <p class="summary-copy">Create a conversation to begin handling a case.</p>
+          }
         </div>
       </aside>
     </div>
@@ -87,15 +100,20 @@
         <input
           id="conversation-title"
           type="text"
+          maxlength="200"
           [value]="newConversationTitle()"
           (input)="newConversationTitle.set($any($event.target).value)"
           placeholder="Fejhallgató reklamáció"
         />
 
+        @if (errorMessage()) {
+          <p class="error-message" role="alert">{{ errorMessage() }}</p>
+        }
+
         <div class="modal-actions">
           <button type="button" class="secondary-button" (click)="closeCreateModal()">Cancel</button>
-          <button type="button" class="primary-button" (click)="createConversation()" [disabled]="!newConversationTitle().trim()">
-            Save
+          <button type="button" class="primary-button" (click)="createConversation()" [disabled]="!newConversationTitle().trim() || newConversationTitle().trim().length > 200 || isCreating()">
+            {{ isCreating() ? 'Creating…' : 'Save' }}
           </button>
         </div>
       </div>

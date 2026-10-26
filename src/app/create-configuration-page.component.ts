@@ -1,6 +1,7 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, computed, inject, signal } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
-import { ConfigurationItem, ConfigurationService, ConfigurationType } from './configuration.service';
+import { ConfigurationService } from './configuration.service';
+import { JsonObject, RequestLlmConfiguration, RequestTemplateConfiguration } from './api.models';
 
 @Component({
   selector: 'app-create-configuration-page',
@@ -25,47 +26,63 @@ import { ConfigurationItem, ConfigurationService, ConfigurationType } from './co
           <div class="field-grid">
             <label class="field-group">
               <span>Name</span>
-              <input type="text" [value]="name()" (input)="name.set($any($event.target).value)" placeholder="Template Configuration" />
+              <input type="text" maxlength="100" [value]="name()" (input)="name.set($any($event.target).value)" placeholder="Template Configuration" />
             </label>
 
             <label class="field-group">
               <span>Rule set version</span>
-              <input type="text" [value]="ruleSetVersion()" (input)="ruleSetVersion.set($any($event.target).value)" placeholder="1.0" />
+              <input type="text" maxlength="50" [value]="ruleSetVersion()" (input)="ruleSetVersion.set($any($event.target).value)" placeholder="1.0" />
             </label>
 
             @if (selectedType() === 'template') {
               <label class="field-group">
                 <span>Template version</span>
-                <input type="text" [value]="templateVersion()" (input)="templateVersion.set($any($event.target).value)" placeholder="1.0" />
+                <input type="text" maxlength="50" [value]="templateVersion()" (input)="templateVersion.set($any($event.target).value)" placeholder="1.0" />
               </label>
             }
 
             @if (selectedType() === 'llm') {
               <label class="field-group">
                 <span>Prompt version</span>
-                <input type="text" [value]="promptVersion()" (input)="promptVersion.set($any($event.target).value)" placeholder="2.0" />
+                <input type="text" maxlength="50" [value]="promptVersion()" (input)="promptVersion.set($any($event.target).value)" placeholder="2.0" />
               </label>
 
               <label class="field-group">
                 <span>Model name</span>
-                <input type="text" [value]="modelName()" (input)="modelName.set($any($event.target).value)" placeholder="Llama-3" />
+                <input type="text" maxlength="100" [value]="modelName()" (input)="modelName.set($any($event.target).value)" placeholder="Llama-3" />
               </label>
 
               <label class="field-group">
                 <span>Temperature</span>
-                <input type="number" step="0.1" [value]="temperature()" (input)="temperature.set(+($any($event.target).value || 0))" />
+                <input type="number" min="0" max="2" step="0.1" [value]="temperature()" (input)="temperature.set(+($any($event.target).value || 0))" />
               </label>
 
               <label class="field-group">
-                <span>Max tokens</span>
-                <input type="number" step="10" [value]="maxTokens()" (input)="maxTokens.set(+($any($event.target).value || 0))" />
+                <span>Max new tokens</span>
+                <input type="number" min="1" step="1" [value]="maxNewTokens()" (input)="maxNewTokens.set(+($any($event.target).value || 0))" />
+              </label>
+
+              <label class="field-group">
+                <span>Top P</span>
+                <input type="number" min="0" max="1" step="0.1" [value]="topP()" (input)="topP.set(+($any($event.target).value || 0))" />
+              </label>
+
+              <label class="field-group checkbox-field">
+                <span>Do sample</span>
+                <input type="checkbox" [checked]="doSample()" (change)="doSample.set($any($event.target).checked)" />
               </label>
             }
           </div>
 
+          @if (errorMessage()) {
+            <p class="error-message" role="alert">{{ errorMessage() }}</p>
+          }
+
           <div class="actions">
             <button type="button" class="secondary-button" [routerLink]="['/configurations']">Cancel</button>
-            <button type="button" class="primary-button" (click)="saveConfiguration()" [disabled]="!canSave()">Save</button>
+            <button type="button" class="primary-button" (click)="saveConfiguration()" [disabled]="!canSave() || isSaving()">
+              {{ isSaving() ? 'Saving…' : 'Save' }}
+            </button>
           </div>
         </div>
       </section>
@@ -85,11 +102,14 @@ import { ConfigurationItem, ConfigurationService, ConfigurationType } from './co
     '.field-group { display: flex; flex-direction: column; gap: 8px; }',
     '.field-group span { font-size: 0.74rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: #475569; }',
     '.field-group input { width: 100%; box-sizing: border-box; border: 1px solid #cbd5e1; border-radius: 12px; padding: 0.8rem 0.9rem; font: inherit; }',
+    '.field-group.checkbox-field { flex-direction: row; align-items: center; justify-content: space-between; }',
+    '.field-group.checkbox-field input { width: 1.1rem; height: 1.1rem; accent-color: #2563eb; }',
     '.actions { display: flex; justify-content: flex-end; gap: 12px; margin-top: 22px; }',
     '.primary-button, .secondary-button { border: none; border-radius: 12px; padding: 0.82rem 1.1rem; font: inherit; font-weight: 700; cursor: pointer; }',
     '.primary-button { background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%); color: #fff; }',
     '.primary-button:disabled { opacity: 0.5; cursor: not-allowed; }',
     '.secondary-button { background: #e2e8f0; color: #0f172a; }',
+    '.error-message { margin: 16px 0 0; color: #b91c1c; font-weight: 600; }',
     '@media (max-width: 640px) { .page-header { flex-direction: column; align-items: flex-start; } .actions { flex-direction: column; } .actions .primary-button, .actions .secondary-button { width: 100%; } }',
   ],
 })
@@ -103,38 +123,71 @@ export class CreateConfigurationPageComponent {
   protected readonly templateVersion = signal('1.0');
   protected readonly promptVersion = signal('2.0');
   protected readonly modelName = signal('Llama-3');
-  protected readonly temperature = signal(0.2);
-  protected readonly maxTokens = signal(500);
-
-  protected readonly canSave = signal(false);
+  protected readonly temperature = signal(0.7);
+  protected readonly maxNewTokens = signal(180);
+  protected readonly doSample = signal(true);
+  protected readonly topP = signal(0.9);
+  protected readonly isSaving = signal(false);
+  protected readonly errorMessage = signal<string | null>(null);
+  protected readonly canSave = computed(() => {
+    const validVersion = (value: string, maxLength: number) =>
+      value.trim().length > 0 && value.trim().length <= maxLength;
+    return (
+      validVersion(this.name(), 100) &&
+      validVersion(this.ruleSetVersion(), 50) &&
+      (this.selectedType() === 'template'
+        ? validVersion(this.templateVersion(), 50)
+        : validVersion(this.promptVersion(), 50) && validVersion(this.modelName(), 100))
+    );
+  });
 
   protected saveConfiguration(): void {
-    const configName = this.name().trim();
-    const ruleSet = this.ruleSetVersion().trim();
-
-    if (!configName || !ruleSet) {
+    if (!this.canSave() || this.isSaving()) {
       return;
     }
 
-    const config: ConfigurationItem = {
-      id: Date.now(),
-      name: configName,
-      type: this.selectedType() === 'llm' ? 'LLM' : 'Template',
-      ruleSetVersion: ruleSet,
-      generationMode: this.selectedType(),
-      ...(this.selectedType() === 'template'
-        ? { templateVersion: this.templateVersion().trim() || '1.0' }
-        : {
-            promptVersion: this.promptVersion().trim() || '2.0',
-            modelName: this.modelName().trim() || 'Llama-3',
-            modelParameters: {
-              temperature: this.temperature(),
-              maxTokens: this.maxTokens(),
-            },
-          }),
-    };
+    this.errorMessage.set(null);
+    this.isSaving.set(true);
 
-    this.configurationService.addConfiguration(config);
-    this.router.navigate(['/configurations', config.id]);
+    if (this.selectedType() === 'template') {
+      const request: RequestTemplateConfiguration = {
+        name: this.name().trim(),
+        ruleSetVersion: this.ruleSetVersion().trim(),
+        templateVersion: this.templateVersion().trim(),
+      };
+      this.configurationService.createTemplateConfiguration(request).subscribe({
+        next: (config) => this.finishSave(config.id),
+        error: (error: unknown) => this.handleSaveError(error),
+      });
+      return;
+    }
+
+    const modelParameters: JsonObject = {
+      max_new_tokens: this.maxNewTokens(),
+      do_sample: this.doSample(),
+      temperature: this.temperature(),
+      top_p: this.topP(),
+    };
+    const request: RequestLlmConfiguration = {
+      name: this.name().trim(),
+      ruleSetVersion: this.ruleSetVersion().trim(),
+      promptVersion: this.promptVersion().trim(),
+      modelName: this.modelName().trim(),
+      modelParameters,
+    };
+    this.configurationService.createLlmConfiguration(request).subscribe({
+      next: (config) => this.finishSave(config.id),
+      error: (error: unknown) => this.handleSaveError(error),
+    });
+  }
+
+  private finishSave(id: number): void {
+    this.isSaving.set(false);
+    this.router.navigate(['/configurations', id]);
+  }
+
+  private handleSaveError(error: unknown): void {
+    this.isSaving.set(false);
+    this.errorMessage.set(ConfigurationService.getErrorMessage(error));
   }
 }

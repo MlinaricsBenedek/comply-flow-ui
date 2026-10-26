@@ -1,6 +1,8 @@
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, DestroyRef, OnInit, computed, inject, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { ConfigurationItem, ConfigurationService } from './configuration.service';
+import { ConfigurationSummaryResponse, JsonObject } from './api.models';
 
 @Component({
   selector: 'app-configuration-page',
@@ -27,6 +29,12 @@ import { ConfigurationItem, ConfigurationService } from './configuration.service
               <span class="count-pill">{{ configurations().length }}</span>
             </div>
 
+            @if (loadingList()) {
+              <p class="status-message">Loading configurations…</p>
+            }
+            @if (errorMessage()) {
+              <p class="error-message" role="alert">{{ errorMessage() }}</p>
+            }
             @for (config of configurations(); track config.id) {
               <button
                 type="button"
@@ -35,36 +43,45 @@ import { ConfigurationItem, ConfigurationService } from './configuration.service
                 (click)="openConfig(config.id)"
               >
                 <div class="card-header">
-                  <span class="type-badge type-{{ config.type.toLowerCase() }}">{{ config.type }}</span>
+                  <span class="config-id">Configuration #{{ config.id }}</span>
                 </div>
-                <h3>{{ config.name }}</h3>
-                <p>{{ config.ruleSetVersion }}</p>
+                <h3>{{ config.name ?? 'Unnamed configuration' }}</h3>
               </button>
+            }
+            @if (!loadingList() && configurations().length === 0) {
+              <p class="status-message">No configurations found.</p>
             }
           </aside>
 
           <section class="details-panel">
+            @if (loadingDetails()) {
+              <div class="detail-card"><p class="status-message">Loading configuration…</p></div>
+            } @else if (selectedId() === 0) {
+              <div class="detail-card"><p class="status-message">Select a configuration to see its details.</p></div>
+            } @else {
             <div class="detail-card">
               <div class="detail-header">
                 <div>
                   <p class="eyebrow">Selected configuration</p>
-                  <h2>{{ selectedConfiguration().name }}</h2>
+                  <h2>{{ selectedConfiguration().name ?? 'Unnamed configuration' }}</h2>
                 </div>
-                <span class="type-badge type-{{ selectedConfiguration().type.toLowerCase() }}">{{ selectedConfiguration().type }}</span>
+                <span class="type-badge type-{{ configurationType(selectedConfiguration().generationMode).toLowerCase() }}">
+                  {{ configurationType(selectedConfiguration().generationMode) }}
+                </span>
               </div>
 
               <div class="meta-grid">
                 <div class="meta-item">
                   <span>Name</span>
-                  <strong>{{ selectedConfiguration().name }}</strong>
+                  <strong>{{ selectedConfiguration().name ?? '—' }}</strong>
                 </div>
                 <div class="meta-item">
                   <span>Rule set version</span>
-                  <strong>{{ selectedConfiguration().ruleSetVersion }}</strong>
+                  <strong>{{ selectedConfiguration().ruleSetVersion ?? '—' }}</strong>
                 </div>
                 <div class="meta-item">
                   <span>Generation mode</span>
-                  <strong>{{ selectedConfiguration().generationMode ?? 'template' }}</strong>
+                  <strong>{{ selectedConfiguration().generationMode ?? '—' }}</strong>
                 </div>
                 @if (selectedConfiguration().templateVersion) {
                   <div class="meta-item">
@@ -100,6 +117,7 @@ import { ConfigurationItem, ConfigurationService } from './configuration.service
                 </div>
               }
             </div>
+            }
           </section>
         </div>
       </section>
@@ -123,6 +141,9 @@ import { ConfigurationItem, ConfigurationService } from './configuration.service
     '.config-card { width: 100%; border: 1px solid #dfe7f1; background: #ffffff; border-radius: 14px; padding: 14px 14px 12px; margin-bottom: 12px; text-align: left; cursor: pointer; }',
     '.config-card.active { border-color: #60a5fa; box-shadow: 0 8px 20px rgba(59, 130, 246, 0.12); }',
     '.card-header { display: flex; justify-content: flex-end; margin-bottom: 8px; }',
+    '.config-id { color: #64748b; font-size: 0.75rem; font-weight: 700; }',
+    '.status-message { color: #64748b; line-height: 1.5; }',
+    '.error-message { color: #b91c1c; line-height: 1.5; }',
     '.type-badge { display: inline-flex; align-items: center; border-radius: 999px; padding: 5px 10px; font-size: 0.7rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; }',
     '.type-template { background: #dcfce7; color: #166534; }',
     '.type-llm { background: #ede9fe; color: #5b21b6; }',
@@ -142,30 +163,68 @@ import { ConfigurationItem, ConfigurationService } from './configuration.service
     '@media (max-width: 768px) { .content-grid { grid-template-columns: 1fr; } .topbar { flex-direction: column; align-items: flex-start; } .topbar-actions { width: 100%; } .topbar-actions .primary-button, .topbar-actions .secondary-button { flex: 1; } }',
   ],
 })
-export class ConfigurationPageComponent {
+export class ConfigurationPageComponent implements OnInit {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
+  private readonly destroyRef = inject(DestroyRef);
   private readonly configurationService = inject(ConfigurationService);
 
-  protected readonly configurations = this.configurationService.configurations;
+  protected readonly configurations = signal<ConfigurationSummaryResponse[]>([]);
   protected readonly selectedId = signal<number>(this.readSelectedId());
+  protected readonly loadingList = signal(true);
+  protected readonly loadingDetails = signal(false);
+  protected readonly errorMessage = signal<string | null>(null);
+  private readonly selectedDetails = signal<ConfigurationItem | null>(null);
 
   protected readonly selectedConfiguration = computed<ConfigurationItem>(() => {
     return (
-      this.configurations().find((config) => config.id === this.selectedId()) ??
-      this.configurations()[0] ??
+      this.selectedDetails() ??
       {
         id: 0,
-        name: 'No configuration selected',
-        type: 'Template',
-        ruleSetVersion: 'n/a',
-        generationMode: 'template',
+        name: null,
+        ruleSetVersion: null,
+        generationMode: null,
       }
     );
   });
 
+  ngOnInit(): void {
+    this.route.paramMap.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((params) => {
+      const routeId = Number(params.get('id'));
+      if (Number.isFinite(routeId) && routeId > 0) {
+        this.loadConfiguration(routeId);
+      } else if (!this.loadingList()) {
+        const firstId = this.configurations()[0]?.id ?? 0;
+        if (firstId > 0) {
+          this.loadConfiguration(firstId);
+        } else {
+          this.selectedId.set(0);
+          this.selectedDetails.set(null);
+        }
+      } else {
+        this.selectedId.set(0);
+      }
+    });
+
+    this.configurationService.getConfigurations().subscribe({
+      next: (configurations) => {
+        this.configurations.set(configurations);
+        this.loadingList.set(false);
+        const routeId = this.readSelectedId();
+        if (routeId === 0 && configurations[0]?.id) {
+          this.loadConfiguration(configurations[0].id);
+        } else if (routeId === 0) {
+          this.selectedId.set(0);
+        }
+      },
+      error: (error: unknown) => {
+        this.loadingList.set(false);
+        this.errorMessage.set(ConfigurationService.getErrorMessage(error));
+      },
+    });
+  }
+
   protected openConfig(id: number): void {
-    this.selectedId.set(id);
     this.router.navigate(['/configurations', id]);
   }
 
@@ -173,11 +232,32 @@ export class ConfigurationPageComponent {
     this.router.navigate(['/configurations/create']);
   }
 
-  protected readonly objectEntries = (source: Record<string, number | string | boolean>): [string, string | number | boolean][] =>
-    Object.entries(source).map(([key, value]) => [key, value]);
+  protected readonly objectEntries = (source: JsonObject): [string, string][] =>
+    Object.entries(source).map(([key, value]) => [key, String(value)]);
+
+  protected configurationType(generationMode: string | null): 'Template' | 'LLM' {
+    return generationMode?.toLowerCase() === 'llm' ? 'LLM' : 'Template';
+  }
+
+  private loadConfiguration(id: number): void {
+    this.selectedId.set(id);
+    this.selectedDetails.set(null);
+    this.loadingDetails.set(true);
+    this.errorMessage.set(null);
+    this.configurationService.getConfiguration(id).subscribe({
+      next: (configuration) => {
+        this.selectedDetails.set(configuration);
+        this.loadingDetails.set(false);
+      },
+      error: (error: unknown) => {
+        this.loadingDetails.set(false);
+        this.errorMessage.set(ConfigurationService.getErrorMessage(error));
+      },
+    });
+  }
 
   private readSelectedId(): number {
     const idFromRoute = Number(this.route.snapshot.paramMap.get('id'));
-    return Number.isFinite(idFromRoute) && idFromRoute > 0 ? idFromRoute : this.configurationService.configurations()[0]?.id ?? 0;
+    return Number.isFinite(idFromRoute) && idFromRoute > 0 ? idFromRoute : 0;
   }
 }

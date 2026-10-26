@@ -1,15 +1,8 @@
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
-
-interface ConversationEntry {
-  id: string;
-  title: string;
-  summary: string;
-  status: 'New' | 'In review' | 'Resolved';
-  statusKey: 'new' | 'review' | 'resolved';
-  createdAt: string;
-  updatedAt: string;
-}
+import { ConversationResponse, RequestConversation } from './api.models';
+import { ConfigurationService } from './configuration.service';
+import { ConversationService } from './conversation.service';
 
 @Component({
   selector: 'app-home-page',
@@ -17,65 +10,46 @@ interface ConversationEntry {
   styleUrl: './app.css',
   templateUrl: './home-page.component.html',
 })
-export class HomePageComponent {
+export class HomePageComponent implements OnInit {
   private readonly router = inject(Router);
+  private readonly conversationService = inject(ConversationService);
 
   protected readonly title = signal('Comply Flow');
-  protected readonly conversations = signal<ConversationEntry[]>([
-    {
-      id: 'conv-101',
-      title: 'Fejhallgató reklamáció',
-      summary: 'Ár és minőség eltérés a rendelésben.',
-      status: 'New',
-      statusKey: 'new',
-      createdAt: '2026-09-27',
-      updatedAt: '09:15',
-    },
-    {
-      id: 'conv-102',
-      title: 'Számlakivonat és kamatvitás',
-      summary: 'A felhasználó a kamat és a követelés összegét vitatja.',
-      status: 'In review',
-      statusKey: 'review',
-      createdAt: '2026-09-25',
-      updatedAt: '08:50',
-    },
-    {
-      id: 'conv-103',
-      title: 'Termékcsere kérése',
-      summary: 'A vevő a termék cseréjét és a pénzvisszatérítést kéri.',
-      status: 'Resolved',
-      statusKey: 'resolved',
-      createdAt: '2026-09-21',
-      updatedAt: '08:10',
-    },
-  ]);
-  protected readonly selectedConversationId = signal('conv-101');
+  protected readonly conversations = signal<ConversationResponse[]>([]);
+  protected readonly selectedConversationId = signal<number | null>(null);
   protected readonly showCreateModal = signal(false);
   protected readonly newConversationTitle = signal('');
+  protected readonly isLoading = signal(true);
+  protected readonly isCreating = signal(false);
+  protected readonly errorMessage = signal<string | null>(null);
+  protected readonly selectedConversation = computed(
+    () =>
+      this.conversations().find(
+        (conversation) => conversation.id === this.selectedConversationId(),
+      ) ?? null,
+  );
 
-  protected readonly selectedConversation = computed(() => {
-    return (
-      this.conversations().find((conversation) => conversation.id === this.selectedConversationId()) ??
-      this.conversations()[0] ??
-      {
-        id: 'empty',
-        title: 'Nincs kiválasztott beszélgetés',
-        summary: 'Hozz létre új beszélgetést a panaszok kezeléséhez.',
-        status: 'New',
-        statusKey: 'new',
-        createdAt: '-',
-        updatedAt: '-',
-      }
-    );
-  });
+  ngOnInit(): void {
+    this.conversationService.getConversations().subscribe({
+      next: (conversations) => {
+        this.conversations.set(conversations);
+        this.selectedConversationId.set(conversations[0]?.id ?? null);
+        this.isLoading.set(false);
+      },
+      error: (error: unknown) => {
+        this.errorMessage.set(ConfigurationService.getErrorMessage(error));
+        this.isLoading.set(false);
+      },
+    });
+  }
 
-  protected openConversation(id: string): void {
+  protected openConversation(id: number): void {
     this.selectedConversationId.set(id);
   }
 
   protected openCreateModal(): void {
     this.newConversationTitle.set('');
+    this.errorMessage.set(null);
     this.showCreateModal.set(true);
   }
 
@@ -86,26 +60,41 @@ export class HomePageComponent {
 
   protected createConversation(): void {
     const title = this.newConversationTitle().trim();
-
-    if (!title) {
+    if (!title || title.length > 200 || this.isCreating()) {
       return;
     }
 
-    const now = new Date();
-    const id = `conv-${now.getTime()}`;
-    const newEntry: ConversationEntry = {
-      id,
-      title,
-      summary: 'Új beszélgetés létrehozva. Az ügyfél üzenete hamarosan feldolgozásra kerül.',
-      status: 'New',
-      statusKey: 'new',
-      createdAt: now.toISOString().slice(0, 10),
-      updatedAt: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-    };
+    const request: RequestConversation = { title };
+    this.isCreating.set(true);
+    this.errorMessage.set(null);
+    this.conversationService.createConversation(request).subscribe({
+      next: (conversation) => {
+        this.isCreating.set(false);
+        this.closeCreateModal();
+        this.router.navigate(['/conversation', conversation.id]);
+      },
+      error: (error: unknown) => {
+        this.isCreating.set(false);
+        this.errorMessage.set(ConfigurationService.getErrorMessage(error));
+      },
+    });
+  }
 
-    this.conversations.update((items) => [newEntry, ...items]);
-    this.selectedConversationId.set(id);
-    this.closeCreateModal();
-    this.router.navigate(['/conversation', id]);
+  protected formatDate(value: string): string {
+    const parsed = new Date(value);
+    return Number.isNaN(parsed.getTime())
+      ? value
+      : parsed.toISOString().slice(0, 10);
+  }
+
+  protected statusKey(status: string | null): 'new' | 'review' | 'resolved' {
+    const normalizedStatus = status?.toLowerCase() ?? '';
+    if (normalizedStatus.includes('complete') || normalizedStatus.includes('resolv')) {
+      return 'resolved';
+    }
+    if (normalizedStatus.includes('process') || normalizedStatus.includes('review')) {
+      return 'review';
+    }
+    return 'new';
   }
 }
