@@ -123,6 +123,7 @@ export interface PreProcessingResultResponse {
 export interface RuleDecisionResultResponse {
   decision: string | null;
   reason: string | null;
+  bank: BankName | null;
   ruleSetVersion: string | null;
   matchedRules: MatchedRuleResultResponse[] | null;
 }
