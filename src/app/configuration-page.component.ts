@@ -2,7 +2,7 @@ import { Component, DestroyRef, OnInit, computed, inject, signal } from '@angula
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { ConfigurationItem, ConfigurationService } from './configuration.service';
-import { BankName, ConfigurationSummaryResponse, JsonObject } from './api.models';
+import { ConfigurationSummaryResponse, JsonObject } from './api.models';
 
 @Component({
   selector: 'app-configuration-page',
@@ -83,10 +83,6 @@ import { BankName, ConfigurationSummaryResponse, JsonObject } from './api.models
                 <div class="meta-item">
                   <span>Generation mode</span>
                   <strong>{{ selectedConfiguration().generationMode ?? '—' }}</strong>
-                </div>
-                <div class="meta-item">
-                  <span>Bank</span>
-                  <strong>{{ bankLabel(selectedConfiguration().bank) }}</strong>
                 </div>
                 @if (selectedConfiguration().templateVersion) {
                   <div class="meta-item">
@@ -242,10 +238,6 @@ export class ConfigurationPageComponent implements OnInit {
 
   protected configurationType(generationMode: string | null): 'Template' | 'LLM' {
     return generationMode?.toLowerCase() === 'llm' ? 'LLM' : 'Template';
-  }
-
-  protected bankLabel(bank: BankName | null | undefined): string {
-    return bank === 'otp' ? 'OTP' : bank === 'raiffeisen' ? 'Raiffeisen' : '—';
   }
 
   private loadConfiguration(id: number): void {

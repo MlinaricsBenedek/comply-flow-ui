@@ -9,7 +9,6 @@ export interface ConfigurationSummaryResponse {
 export interface ConfigurationResponse extends ConfigurationSummaryResponse {
   ruleSetVersion: string | null;
   generationMode: string | null;
-  bank?: BankName | null;
   templateVersion?: string | null;
   promptVersion?: string | null;
   modelName?: string | null;
