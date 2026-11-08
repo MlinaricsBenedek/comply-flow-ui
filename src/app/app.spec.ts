@@ -9,7 +9,11 @@ describe('HomePageComponent', () => {
   beforeEach(async () => {
     await TestBed.configureTestingModule({
       imports: [HomePageComponent],
-      providers: [provideRouter([]), provideHttpClient(), provideHttpClientTesting()],
+      providers: [
+        provideRouter([{ path: 'configurations/:id', component: CreateConfigurationPageComponent }]),
+        provideHttpClient(),
+        provideHttpClientTesting(),
+      ],
     }).compileComponents();
   });
 
@@ -82,5 +86,87 @@ describe('HomePageComponent', () => {
       'v1.4',
     ]);
     expect(promptVersionSelect?.value).toBe('v1.1');
+  });
+
+  it('should default the bank to OTP and send the selected bank with template configurations', () => {
+    const fixture = TestBed.createComponent(CreateConfigurationPageComponent);
+    fixture.detectChanges();
+    const compiled = fixture.nativeElement as HTMLElement;
+    const bankSelect = [...compiled.querySelectorAll('label')]
+      .find((label) => label.textContent?.includes('Bank'))
+      ?.querySelector('select');
+    const nameInput = [...compiled.querySelectorAll('label')]
+      .find((label) => label.textContent?.includes('Name'))
+      ?.querySelector('input');
+
+    expect(bankSelect?.value).toBe('otp');
+    if (!bankSelect || !nameInput) {
+      throw new Error('Expected bank and name inputs to be rendered.');
+    }
+
+    bankSelect.value = 'raiffeisen';
+    bankSelect.dispatchEvent(new Event('change'));
+    nameInput.value = 'Test configuration';
+    nameInput.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+
+    [...compiled.querySelectorAll('button')]
+      .find((button) => button.textContent?.trim() === 'Save')
+      ?.click();
+
+    const request = TestBed.inject(HttpTestingController).expectOne('/api/configurations/template');
+    expect(request.request.body).toEqual({
+      name: 'Test configuration',
+      ruleSetVersion: '1.0',
+      templateVersion: '1.0',
+      bank: 'raiffeisen',
+    });
+    request.flush({ id: 1, name: 'Test configuration', bank: 'raiffeisen' });
+  });
+
+  it('should send the selected bank with LLM configurations', () => {
+    const fixture = TestBed.createComponent(CreateConfigurationPageComponent);
+    fixture.detectChanges();
+    const compiled = fixture.nativeElement as HTMLElement;
+    [...compiled.querySelectorAll('button')]
+      .find((button) => button.textContent?.trim() === 'LLM')
+      ?.click();
+    fixture.detectChanges();
+
+    const bankSelect = [...compiled.querySelectorAll('label')]
+      .find((label) => label.textContent?.includes('Bank'))
+      ?.querySelector('select');
+    const nameInput = [...compiled.querySelectorAll('label')]
+      .find((label) => label.textContent?.includes('Name'))
+      ?.querySelector('input');
+    if (!bankSelect || !nameInput) {
+      throw new Error('Expected bank and name inputs to be rendered.');
+    }
+
+    bankSelect.value = 'raiffeisen';
+    bankSelect.dispatchEvent(new Event('change'));
+    nameInput.value = 'Test LLM configuration';
+    nameInput.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+
+    [...compiled.querySelectorAll('button')]
+      .find((button) => button.textContent?.trim() === 'Save')
+      ?.click();
+
+    const request = TestBed.inject(HttpTestingController).expectOne('/api/configurations/llm');
+    expect(request.request.body).toEqual({
+      name: 'Test LLM configuration',
+      ruleSetVersion: '1.0',
+      promptVersion: 'v1.1',
+      modelName: 'qwen2.5-0.5b-instruct',
+      modelParameters: {
+        max_new_tokens: 180,
+        do_sample: true,
+        temperature: 0.7,
+        top_p: 0.9,
+      },
+      bank: 'raiffeisen',
+    });
+    request.flush({ id: 2, name: 'Test LLM configuration', bank: 'raiffeisen' });
   });
 });

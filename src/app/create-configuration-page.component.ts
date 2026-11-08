@@ -1,7 +1,12 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import { ConfigurationService } from './configuration.service';
-import { JsonObject, RequestLlmConfiguration, RequestTemplateConfiguration } from './api.models';
+import {
+  BankName,
+  JsonObject,
+  RequestLlmConfiguration,
+  RequestTemplateConfiguration,
+} from './api.models';
 
 @Component({
   selector: 'app-create-configuration-page',
@@ -28,6 +33,14 @@ import { JsonObject, RequestLlmConfiguration, RequestTemplateConfiguration } fro
             <label class="field-group">
               <span>Name</span>
               <input type="text" maxlength="100" [value]="name()" (input)="name.set($any($event.target).value)" placeholder="Template Configuration" />
+            </label>
+
+            <label class="field-group">
+              <span>Bank</span>
+              <select [value]="bank()" (change)="bank.set($any($event.target).value)">
+                <option value="otp">OTP</option>
+                <option value="raiffeisen">Raiffeisen</option>
+              </select>
             </label>
 
             <label class="field-group">
@@ -156,6 +169,7 @@ export class CreateConfigurationPageComponent {
   ];
   protected readonly selectedType = signal<'template' | 'llm'>('template');
   protected readonly name = signal('');
+  protected readonly bank = signal<BankName>('otp');
   protected readonly ruleSetVersion = signal('1.0');
   protected readonly templateVersion = signal('1.0');
   protected readonly promptVersion = signal<(typeof this.promptVersionOptions)[number]>('v1.1');
@@ -194,6 +208,7 @@ export class CreateConfigurationPageComponent {
         name: this.name().trim(),
         ruleSetVersion: this.ruleSetVersion().trim(),
         templateVersion: this.templateVersion().trim(),
+        bank: this.bank(),
       };
       this.configurationService.createTemplateConfiguration(request).subscribe({
         next: (config) => this.finishSave(config.id),
@@ -214,6 +229,7 @@ export class CreateConfigurationPageComponent {
       promptVersion: this.promptVersion().trim(),
       modelName: this.modelName().trim(),
       modelParameters,
+      bank: this.bank(),
     };
     this.configurationService.createLlmConfiguration(request).subscribe({
       next: (config) => this.finishSave(config.id),

@@ -1,4 +1,5 @@
 export type JsonObject = Record<string, unknown>;
+export type BankName = 'otp' | 'raiffeisen';
 
 export interface ConfigurationSummaryResponse {
   id: number;
@@ -8,6 +9,7 @@ export interface ConfigurationSummaryResponse {
 export interface ConfigurationResponse extends ConfigurationSummaryResponse {
   ruleSetVersion: string | null;
   generationMode: string | null;
+  bank?: BankName | null;
   templateVersion?: string | null;
   promptVersion?: string | null;
   modelName?: string | null;
@@ -18,6 +20,7 @@ export interface RequestTemplateConfiguration {
   name: string;
   ruleSetVersion: string;
   templateVersion: string;
+  bank: BankName;
 }
 
 export interface RequestLlmConfiguration {
@@ -26,6 +29,7 @@ export interface RequestLlmConfiguration {
   promptVersion: string;
   modelName: string;
   modelParameters: JsonObject;
+  bank: BankName;
 }
 
 export interface RequestConversation {
@@ -57,6 +61,7 @@ export interface ConversationRequestMessageResponse {
   id: number;
   content: string | null;
   createdAt: string;
+  configurationId?: number | null;
 }
 
 export interface ConversationGeneratedMessageResponse {
@@ -73,6 +78,7 @@ export interface ConversationMessageErrorResponse {
 export interface ConversationExchangeResponse {
   processingId: number;
   status: string | null;
+  configurationId?: number | null;
   request: ConversationRequestMessageResponse | null;
   response: ConversationGeneratedMessageResponse | null;
   error: ConversationMessageErrorResponse | null;

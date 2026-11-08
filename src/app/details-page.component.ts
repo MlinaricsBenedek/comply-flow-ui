@@ -2,7 +2,7 @@ import { Component, DestroyRef, OnInit, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router } from '@angular/router';
 import { EMPTY, catchError, switchMap, takeWhile, timer } from 'rxjs';
-import { ConversationResponse, ProcessingResultResponse } from './api.models';
+import { BankName, ConversationResponse, ProcessingResultResponse } from './api.models';
 import { ConfigurationService } from './configuration.service';
 import { ConversationService } from './conversation.service';
 
@@ -34,6 +34,7 @@ import { ConversationService } from './conversation.service';
               <div class="meta-box"><span>Finished</span><strong>{{ formatDate(processing.finishedAt) }}</strong></div>
               <div class="meta-box"><span>Finished</span><strong>{{ processing.isFinished ? 'Yes' : 'No' }}</strong></div>
               <div class="meta-box"><span>Results available</span><strong>{{ processing.resultsAvailable ? 'Yes' : 'No' }}</strong></div>
+              <div class="meta-box"><span>Bank</span><strong>{{ bankLabel(configurationBank()) }}</strong></div>
             </div>
 
             @if (processing.availabilityMessage) {
@@ -217,11 +218,13 @@ export class DetailsPageComponent implements OnInit {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly configurationService = inject(ConfigurationService);
   private readonly conversationService = inject(ConversationService);
 
   protected readonly conversationId = signal<number | null>(null);
   protected readonly processingId = signal<number | null>(null);
   protected readonly conversation = signal<ConversationResponse | null>(null);
+  protected readonly configurationBank = signal<BankName | null>(null);
   protected readonly result = signal<ProcessingResultResponse | null>(null);
   protected readonly loading = signal(true);
   protected readonly errorMessage = signal<string | null>(null);
@@ -246,9 +249,11 @@ export class DetailsPageComponent implements OnInit {
           this.conversationId.set(conversationId);
           this.processingId.set(processingId);
           this.result.set(null);
+          this.configurationBank.set(null);
           this.loading.set(true);
           this.errorMessage.set(null);
           this.loadConversationTitle(conversationId);
+          this.loadConfigurationBank(conversationId, processingId);
           return timer(0, 1500).pipe(
             switchMap(() => this.conversationService.getProcessingResult(processingId)),
             takeWhile((result, index) => !result.isFinished && index < 59, true),
@@ -287,6 +292,10 @@ export class DetailsPageComponent implements OnInit {
     return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
   }
 
+  protected bankLabel(bank: BankName | null): string {
+    return bank === 'otp' ? 'OTP' : bank === 'raiffeisen' ? 'Raiffeisen' : '—';
+  }
+
   protected formatJson(value: string): string {
     try {
       return JSON.stringify(JSON.parse(value), null, 2);
@@ -309,5 +318,33 @@ export class DetailsPageComponent implements OnInit {
         takeUntilDestroyed(this.destroyRef),
       )
       .subscribe((conversation) => this.conversation.set(conversation));
+  }
+
+  private loadConfigurationBank(conversationId: number, processingId: number): void {
+    this.conversationService
+      .getConversationMessages(conversationId)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (messages) => {
+          const exchange = messages.messages?.find(
+            (message) => message.processingId === processingId,
+          );
+          const configurationId = exchange?.configurationId ?? exchange?.request?.configurationId;
+          if (!configurationId) {
+            return;
+          }
+
+          this.configurationService
+            .getConfiguration(configurationId)
+            .pipe(takeUntilDestroyed(this.destroyRef))
+            .subscribe({
+              next: (configuration) => this.configurationBank.set(configuration.bank ?? null),
+              error: (error: unknown) =>
+                this.errorMessage.set(ConfigurationService.getErrorMessage(error)),
+            });
+        },
+        error: (error: unknown) =>
+          this.errorMessage.set(ConfigurationService.getErrorMessage(error)),
+      });
   }
 }
