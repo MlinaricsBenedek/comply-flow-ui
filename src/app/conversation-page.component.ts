@@ -21,6 +21,7 @@ interface ChatMessage {
 
 @Component({
   selector: 'app-conversation-page',
+  standalone: true,
   imports: [RouterLink],
   template: `
     <main class="conversation-page">
@@ -35,6 +36,9 @@ interface ChatMessage {
           </div>
 
           <div class="header-actions">
+            <button type="button" class="secondary-button" [routerLink]="['/']" [queryParams]="{ newChat: true }">
+              + New chat
+            </button>
             <label class="field-group compact">
               <span>Configuration</span>
               <select

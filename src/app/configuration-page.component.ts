@@ -6,6 +6,7 @@ import { ConfigurationSummaryResponse, JsonObject } from './api.models';
 
 @Component({
   selector: 'app-configuration-page',
+  standalone: true,
   imports: [RouterLink],
   template: `
     <main class="config-page">

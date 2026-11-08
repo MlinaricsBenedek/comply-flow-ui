@@ -8,6 +8,7 @@ import { ConversationService } from './conversation.service';
 
 @Component({
   selector: 'app-details-page',
+  standalone: true,
   template: `
     <main class="details-page">
       <section class="details-shell">

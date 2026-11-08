@@ -1,17 +1,19 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
-import { Router, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { ConversationResponse, RequestConversation } from './api.models';
 import { ConfigurationService } from './configuration.service';
 import { ConversationService } from './conversation.service';
 
 @Component({
   selector: 'app-home-page',
+  standalone: true,
   imports: [RouterLink],
   styleUrl: './app.css',
   templateUrl: './home-page.component.html',
 })
 export class HomePageComponent implements OnInit {
   private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
   private readonly conversationService = inject(ConversationService);
 
   protected readonly title = signal('Comply Flow');
@@ -30,6 +32,10 @@ export class HomePageComponent implements OnInit {
   );
 
   ngOnInit(): void {
+    if (this.route.snapshot.queryParamMap.get('newChat') === 'true') {
+      this.openCreateModal();
+    }
+
     this.conversationService.getConversations().subscribe({
       next: (conversations) => {
         this.conversations.set(conversations);
@@ -51,11 +57,22 @@ export class HomePageComponent implements OnInit {
     this.newConversationTitle.set('');
     this.errorMessage.set(null);
     this.showCreateModal.set(true);
+    this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: { newChat: true },
+      queryParamsHandling: 'merge',
+      replaceUrl: true,
+    });
   }
 
   protected closeCreateModal(): void {
     this.showCreateModal.set(false);
     this.newConversationTitle.set('');
+    this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: { newChat: null },
+      replaceUrl: true,
+    });
   }
 
   protected createConversation(): void {

@@ -5,6 +5,7 @@ import { JsonObject, RequestLlmConfiguration, RequestTemplateConfiguration } fro
 
 @Component({
   selector: 'app-create-configuration-page',
+  standalone: true,
   imports: [RouterLink],
   template: `
     <main class="create-config-page">
@@ -44,7 +45,14 @@ import { JsonObject, RequestLlmConfiguration, RequestTemplateConfiguration } fro
             @if (selectedType() === 'llm') {
               <label class="field-group">
                 <span>Prompt version</span>
-                <input type="text" maxlength="50" [value]="promptVersion()" (input)="promptVersion.set($any($event.target).value)" placeholder="2.0" />
+                <select
+                  [value]="promptVersion()"
+                  (change)="promptVersion.set($any($event.target).value)"
+                >
+                  @for (version of promptVersionOptions; track version) {
+                    <option [value]="version">{{ version }}</option>
+                  }
+                </select>
               </label>
 
               <label class="field-group">
@@ -123,6 +131,7 @@ export class CreateConfigurationPageComponent {
   private readonly router = inject(Router);
   private readonly configurationService = inject(ConfigurationService);
 
+  protected readonly promptVersionOptions = ['v1.1', 'v1.2', 'v1.3', 'v1.4'] as const;
   protected readonly modelOptions = [
     {
       id: 'qwen2.5-0.5b-instruct',
@@ -149,7 +158,7 @@ export class CreateConfigurationPageComponent {
   protected readonly name = signal('');
   protected readonly ruleSetVersion = signal('1.0');
   protected readonly templateVersion = signal('1.0');
-  protected readonly promptVersion = signal('2.0');
+  protected readonly promptVersion = signal<(typeof this.promptVersionOptions)[number]>('v1.1');
   protected readonly modelName = signal(this.modelOptions[0].id);
   protected readonly selectedModelDescription = computed(
     () => this.modelOptions.find((model) => model.id === this.modelName())?.description ?? '',

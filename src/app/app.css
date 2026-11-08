@@ -127,6 +127,16 @@
   margin-bottom: 18px;
 }
 
+.panel-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.add-chat-button {
+  white-space: nowrap;
+}
+
 .eyebrow {
   margin: 0 0 6px;
   font-size: 0.72rem;
@@ -471,6 +481,10 @@
     justify-content: flex-start;
     flex-wrap: wrap;
   }
+
+  .panel-header {
+    flex-wrap: wrap;
+  }
 }
 
 @media (max-width: 560px) {
@@ -487,6 +501,15 @@
   .chat-composer {
     flex-direction: column;
     align-items: stretch;
+  }
+
+  .panel-header-actions {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .panel-header-actions .add-chat-button {
+    width: auto;
   }
 
   .primary-button,

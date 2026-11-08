@@ -8,7 +8,6 @@
 
       <div class="topbar-actions">
         <button type="button" class="secondary-button" [routerLink]="['/configurations']">Configurations</button>
-        <button type="button" class="primary-button" (click)="openCreateModal()">+ New Conversation</button>
       </div>
     </header>
 
@@ -19,7 +18,12 @@
             <p class="eyebrow">Recent cases</p>
             <h2>Conversations</h2>
           </div>
-          <span class="count-pill">{{ conversations().length }} total</span>
+          <div class="panel-header-actions">
+            <span class="count-pill">{{ conversations().length }} total</span>
+            <button type="button" class="primary-button add-chat-button" (click)="openCreateModal()">
+              + Add chat
+            </button>
+          </div>
         </div>
 
         <div class="conversation-list">
