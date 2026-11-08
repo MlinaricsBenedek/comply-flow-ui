@@ -48,8 +48,13 @@ import { JsonObject, RequestLlmConfiguration, RequestTemplateConfiguration } fro
               </label>
 
               <label class="field-group">
-                <span>Model name</span>
-                <input type="text" maxlength="100" [value]="modelName()" (input)="modelName.set($any($event.target).value)" placeholder="Llama-3" />
+                <span>Model</span>
+                <select [value]="modelName()" (change)="modelName.set($any($event.target).value)">
+                  @for (model of modelOptions; track model.id) {
+                    <option [value]="model.id">{{ model.id }} — {{ model.name }}</option>
+                  }
+                </select>
+                <small>{{ selectedModelDescription() }}</small>
               </label>
 
               <label class="field-group">
@@ -101,7 +106,8 @@ import { JsonObject, RequestLlmConfiguration, RequestTemplateConfiguration } fro
     '.field-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; }',
     '.field-group { display: flex; flex-direction: column; gap: 8px; }',
     '.field-group span { font-size: 0.74rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: #475569; }',
-    '.field-group input { width: 100%; box-sizing: border-box; border: 1px solid #cbd5e1; border-radius: 12px; padding: 0.8rem 0.9rem; font: inherit; }',
+    '.field-group input, .field-group select { width: 100%; box-sizing: border-box; border: 1px solid #cbd5e1; border-radius: 12px; padding: 0.8rem 0.9rem; font: inherit; }',
+    '.field-group small { color: #64748b; line-height: 1.4; }',
     '.field-group.checkbox-field { flex-direction: row; align-items: center; justify-content: space-between; }',
     '.field-group.checkbox-field input { width: 1.1rem; height: 1.1rem; accent-color: #2563eb; }',
     '.actions { display: flex; justify-content: flex-end; gap: 12px; margin-top: 22px; }',
@@ -117,12 +123,37 @@ export class CreateConfigurationPageComponent {
   private readonly router = inject(Router);
   private readonly configurationService = inject(ConfigurationService);
 
+  protected readonly modelOptions = [
+    {
+      id: 'qwen2.5-0.5b-instruct',
+      name: 'Qwen/Qwen2.5-0.5B-Instruct',
+      description: 'Alapértelmezett válaszgeneráló modell',
+    },
+    {
+      id: 'qwen2-0.5b-instruct',
+      name: 'Qwen/Qwen2-0.5B-Instruct',
+      description: 'Válaszgenerálás',
+    },
+    {
+      id: 'llama-tiny-1.1b-chat',
+      name: 'TinyLlama/TinyLlama-1.1B-Chat-v1.0',
+      description: 'Válaszgenerálás',
+    },
+    {
+      id: 'llama-3.2-1b-instruct',
+      name: 'meta-llama/Llama-3.2-1B-Instruct',
+      description: 'Válaszgenerálás',
+    },
+  ];
   protected readonly selectedType = signal<'template' | 'llm'>('template');
   protected readonly name = signal('');
   protected readonly ruleSetVersion = signal('1.0');
   protected readonly templateVersion = signal('1.0');
   protected readonly promptVersion = signal('2.0');
-  protected readonly modelName = signal('Llama-3');
+  protected readonly modelName = signal(this.modelOptions[0].id);
+  protected readonly selectedModelDescription = computed(
+    () => this.modelOptions.find((model) => model.id === this.modelName())?.description ?? '',
+  );
   protected readonly temperature = signal(0.7);
   protected readonly maxNewTokens = signal(180);
   protected readonly doSample = signal(true);
