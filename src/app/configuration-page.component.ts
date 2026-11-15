@@ -77,10 +77,6 @@ import { ConfigurationSummaryResponse, JsonObject } from './api.models';
                   <strong>{{ selectedConfiguration().name ?? '—' }}</strong>
                 </div>
                 <div class="meta-item">
-                  <span>Rule set version</span>
-                  <strong>{{ selectedConfiguration().ruleSetVersion ?? '—' }}</strong>
-                </div>
-                <div class="meta-item">
                   <span>Generation mode</span>
                   <strong>{{ selectedConfiguration().generationMode ?? '—' }}</strong>
                 </div>
@@ -104,11 +100,12 @@ import { ConfigurationSummaryResponse, JsonObject } from './api.models';
                 }
               </div>
 
-              @if (selectedConfiguration().modelParameters) {
+              @let modelParameters = objectEntries(selectedConfiguration().modelParameters ?? {});
+              @if (modelParameters.length > 0) {
                 <div class="parameter-box">
                   <h3>Model parameters</h3>
                   <div class="parameter-grid">
-                    @for (entry of objectEntries(selectedConfiguration().modelParameters ?? {}); track entry[0]) {
+                    @for (entry of modelParameters; track entry[0]) {
                       <div class="parameter-item">
                         <span>{{ entry[0] }}</span>
                         <strong>{{ entry[1] }}</strong>
@@ -234,7 +231,9 @@ export class ConfigurationPageComponent implements OnInit {
   }
 
   protected readonly objectEntries = (source: JsonObject): [string, string][] =>
-    Object.entries(source).map(([key, value]) => [key, String(value)]);
+    Object.entries(source)
+      .filter(([key]) => key !== 'do_sample')
+      .map(([key, value]) => [key, String(value)]);
 
   protected configurationType(generationMode: string | null): 'Template' | 'LLM' {
     return generationMode?.toLowerCase() === 'llm' ? 'LLM' : 'Template';

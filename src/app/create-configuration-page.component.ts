@@ -43,11 +43,6 @@ import {
               </select>
             </label>
 
-            <label class="field-group">
-              <span>Rule set version</span>
-              <input type="text" maxlength="50" [value]="ruleSetVersion()" (input)="ruleSetVersion.set($any($event.target).value)" placeholder="1.0" />
-            </label>
-
             @if (selectedType() === 'template') {
               <label class="field-group">
                 <span>Template version</span>
@@ -93,10 +88,6 @@ import {
                 <input type="number" min="0" max="1" step="0.1" [value]="topP()" (input)="topP.set(+($any($event.target).value || 0))" />
               </label>
 
-              <label class="field-group checkbox-field">
-                <span>Do sample</span>
-                <input type="checkbox" [checked]="doSample()" (change)="doSample.set($any($event.target).checked)" />
-              </label>
             }
           </div>
 
@@ -129,8 +120,6 @@ import {
     '.field-group span { font-size: 0.74rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: #475569; }',
     '.field-group input, .field-group select { width: 100%; box-sizing: border-box; border: 1px solid #cbd5e1; border-radius: 12px; padding: 0.8rem 0.9rem; font: inherit; }',
     '.field-group small { color: #64748b; line-height: 1.4; }',
-    '.field-group.checkbox-field { flex-direction: row; align-items: center; justify-content: space-between; }',
-    '.field-group.checkbox-field input { width: 1.1rem; height: 1.1rem; accent-color: #2563eb; }',
     '.actions { display: flex; justify-content: flex-end; gap: 12px; margin-top: 22px; }',
     '.primary-button, .secondary-button { border: none; border-radius: 12px; padding: 0.82rem 1.1rem; font: inherit; font-weight: 700; cursor: pointer; }',
     '.primary-button { background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%); color: #fff; }',
@@ -147,24 +136,9 @@ export class CreateConfigurationPageComponent {
   protected readonly promptVersionOptions = ['v1.1', 'v1.2', 'v1.3', 'v1.4'] as const;
   protected readonly modelOptions = [
     {
-      id: 'qwen2.5-0.5b-instruct',
-      name: 'Qwen/Qwen2.5-0.5B-Instruct',
+      id: 'qwen2.5-1.5b-instruct',
+      name: 'Qwen/Qwen2.5-1.5B-Instruct',
       description: 'Alapértelmezett válaszgeneráló modell',
-    },
-    {
-      id: 'qwen2-0.5b-instruct',
-      name: 'Qwen/Qwen2-0.5B-Instruct',
-      description: 'Válaszgenerálás',
-    },
-    {
-      id: 'llama-tiny-1.1b-chat',
-      name: 'TinyLlama/TinyLlama-1.1B-Chat-v1.0',
-      description: 'Válaszgenerálás',
-    },
-    {
-      id: 'llama-3.2-1b-instruct',
-      name: 'meta-llama/Llama-3.2-1B-Instruct',
-      description: 'Válaszgenerálás',
     },
   ];
   protected readonly selectedType = signal<'template' | 'llm'>('template');

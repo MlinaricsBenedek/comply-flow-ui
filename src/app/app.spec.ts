@@ -2,6 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting, HttpTestingController } from '@angular/common/http/testing';
 import { provideRouter } from '@angular/router';
+import { ConfigurationPageComponent } from './configuration-page.component';
 import { CreateConfigurationPageComponent } from './create-configuration-page.component';
 import { HomePageComponent } from './home-page.component';
 
@@ -88,10 +89,30 @@ describe('HomePageComponent', () => {
     expect(promptVersionSelect?.value).toBe('v1.1');
   });
 
+  it('should offer only Qwen 2.5 1.5B for LLM configurations', () => {
+    const fixture = TestBed.createComponent(CreateConfigurationPageComponent);
+    fixture.detectChanges();
+    const compiled = fixture.nativeElement as HTMLElement;
+    [...compiled.querySelectorAll('button')]
+      .find((button) => button.textContent?.trim() === 'LLM')
+      ?.click();
+    fixture.detectChanges();
+
+    const modelSelect = [...compiled.querySelectorAll('label')]
+      .find((label) => label.textContent?.includes('Model'))
+      ?.querySelector('select');
+
+    expect([...(modelSelect?.options ?? [])].map((option) => option.value)).toEqual([
+      'qwen2.5-1.5b-instruct',
+    ]);
+    expect(modelSelect?.value).toBe('qwen2.5-1.5b-instruct');
+  });
+
   it('should default the bank to OTP and send the selected bank with template configurations', () => {
     const fixture = TestBed.createComponent(CreateConfigurationPageComponent);
     fixture.detectChanges();
     const compiled = fixture.nativeElement as HTMLElement;
+    expect(compiled.textContent).not.toContain('Rule set version');
     const bankSelect = [...compiled.querySelectorAll('label')]
       .find((label) => label.textContent?.includes('Bank'))
       ?.querySelector('select');
@@ -133,6 +154,8 @@ describe('HomePageComponent', () => {
       ?.click();
     fixture.detectChanges();
 
+    expect(compiled.textContent).not.toContain('Rule set version');
+    expect(compiled.textContent).not.toContain('Do sample');
     const bankSelect = [...compiled.querySelectorAll('label')]
       .find((label) => label.textContent?.includes('Bank'))
       ?.querySelector('select');
@@ -158,7 +181,7 @@ describe('HomePageComponent', () => {
       name: 'Test LLM configuration',
       ruleSetVersion: '1.0',
       promptVersion: 'v1.1',
-      modelName: 'qwen2.5-0.5b-instruct',
+      modelName: 'qwen2.5-1.5b-instruct',
       modelParameters: {
         max_new_tokens: 180,
         do_sample: true,
@@ -168,5 +191,27 @@ describe('HomePageComponent', () => {
       bank: 'raiffeisen',
     });
     request.flush({ id: 2, name: 'Test LLM configuration', bank: 'raiffeisen' });
+  });
+
+  it('should hide rule set version and do_sample in configuration details', () => {
+    const fixture = TestBed.createComponent(ConfigurationPageComponent);
+    fixture.detectChanges();
+    const http = TestBed.inject(HttpTestingController);
+    http.expectOne('/api/configurations').flush([{ id: 1, name: 'Test configuration' }]);
+    http.expectOne('/api/configurations/1').flush({
+      id: 1,
+      name: 'Test configuration',
+      ruleSetVersion: 'hidden-version',
+      generationMode: 'llm',
+      modelParameters: { do_sample: true, temperature: 0.7 },
+    });
+    fixture.detectChanges();
+
+    const compiled = fixture.nativeElement as HTMLElement;
+    expect(compiled.textContent).not.toContain('Rule set version');
+    expect(compiled.textContent).not.toContain('hidden-version');
+    expect(compiled.textContent).not.toContain('do_sample');
+    expect(compiled.textContent).toContain('temperature');
+    expect(compiled.textContent).toContain('0.7');
   });
 });
