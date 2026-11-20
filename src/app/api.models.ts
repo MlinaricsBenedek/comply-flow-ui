@@ -7,7 +7,6 @@ export interface ConfigurationSummaryResponse {
 }
 
 export interface ConfigurationResponse extends ConfigurationSummaryResponse {
-  ruleSetVersion: string | null;
   generationMode: string | null;
   templateVersion?: string | null;
   promptVersion?: string | null;
@@ -17,14 +16,12 @@ export interface ConfigurationResponse extends ConfigurationSummaryResponse {
 
 export interface RequestTemplateConfiguration {
   name: string;
-  ruleSetVersion: string;
   templateVersion: string;
   bank: BankName;
 }
 
 export interface RequestLlmConfiguration {
   name: string;
-  ruleSetVersion: string;
   promptVersion: string;
   modelName: string;
   modelParameters: JsonObject;
@@ -123,7 +120,6 @@ export interface RuleDecisionResultResponse {
   decision: string | null;
   reason: string | null;
   bank: BankName | null;
-  ruleSetVersion: string | null;
   matchedRules: MatchedRuleResultResponse[] | null;
 }
 

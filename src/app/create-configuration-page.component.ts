@@ -45,11 +45,6 @@ import {
 
             @if (selectedType() === 'template') {
               <label class="field-group">
-                <span>Rule set version</span>
-                <input type="text" maxlength="50" [value]="templateRuleSetVersion()" (input)="templateRuleSetVersion.set($any($event.target).value)" placeholder="1.0" />
-              </label>
-
-              <label class="field-group">
                 <span>Template version</span>
                 <select [value]="templateVersion()" (change)="templateVersion.set($any($event.target).value)">
                   @for (version of templateVersionOptions; track version) {
@@ -154,8 +149,6 @@ export class CreateConfigurationPageComponent {
   protected readonly selectedType = signal<'template' | 'llm'>('template');
   protected readonly name = signal('');
   protected readonly bank = signal<BankName>('otp');
-  protected readonly ruleSetVersion = signal('1.0');
-  protected readonly templateRuleSetVersion = signal('1.0');
   protected readonly templateVersion = signal<(typeof this.templateVersionOptions)[number]>('template-v1');
   protected readonly promptVersion = signal<(typeof this.promptVersionOptions)[number]>('v1.1');
   protected readonly modelName = signal(this.modelOptions[0].id);
@@ -174,9 +167,8 @@ export class CreateConfigurationPageComponent {
     return (
       validVersion(this.name(), 100) &&
       (this.selectedType() === 'template'
-        ? validVersion(this.templateRuleSetVersion(), 50) && validVersion(this.templateVersion(), 50)
-        : validVersion(this.ruleSetVersion(), 50) &&
-          validVersion(this.promptVersion(), 50) &&
+        ? validVersion(this.templateVersion(), 50)
+        : validVersion(this.promptVersion(), 50) &&
           validVersion(this.modelName(), 100))
     );
   });
@@ -192,7 +184,6 @@ export class CreateConfigurationPageComponent {
     if (this.selectedType() === 'template') {
       const request: RequestTemplateConfiguration = {
         name: this.name().trim(),
-        ruleSetVersion: this.templateRuleSetVersion().trim(),
         templateVersion: this.templateVersion().trim(),
         bank: this.bank(),
       };
@@ -211,7 +202,6 @@ export class CreateConfigurationPageComponent {
     };
     const request: RequestLlmConfiguration = {
       name: this.name().trim(),
-      ruleSetVersion: this.ruleSetVersion().trim(),
       promptVersion: this.promptVersion().trim(),
       modelName: this.modelName().trim(),
       modelParameters,

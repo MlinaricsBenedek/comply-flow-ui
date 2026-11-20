@@ -180,7 +180,6 @@ export class ConfigurationPageComponent implements OnInit {
       {
         id: 0,
         name: null,
-        ruleSetVersion: null,
         generationMode: null,
       }
     );

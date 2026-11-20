@@ -78,7 +78,6 @@ import { ConversationService } from './conversation.service';
                   <div class="meta-grid">
                     <div class="meta-box"><span>Decision</span><strong>{{ rules.decision ?? '—' }}</strong></div>
                     <div class="meta-box"><span>Bank</span><strong>{{ bankLabel(rules.bank) }}</strong></div>
-                    <div class="meta-box"><span>Rule set version</span><strong>{{ rules.ruleSetVersion ?? '—' }}</strong></div>
                   </div>
                   @if (rules.reason) {
                     <p>{{ rules.reason }}</p>

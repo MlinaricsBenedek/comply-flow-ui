@@ -108,7 +108,7 @@ describe('HomePageComponent', () => {
     expect(modelSelect?.value).toBe('qwen2.5-1.5b-instruct');
   });
 
-  it('should send the selected bank, rule set version and template version', () => {
+  it('should create a template configuration without a rule set version', () => {
     const fixture = TestBed.createComponent(CreateConfigurationPageComponent);
     fixture.detectChanges();
     const compiled = fixture.nativeElement as HTMLElement;
@@ -118,9 +118,6 @@ describe('HomePageComponent', () => {
     const nameInput = [...compiled.querySelectorAll('label')]
       .find((label) => label.textContent?.includes('Name'))
       ?.querySelector('input');
-    const ruleSetInput = [...compiled.querySelectorAll('label')]
-      .find((label) => label.textContent?.includes('Rule set version'))
-      ?.querySelector('input');
     const templateVersionSelect = [...compiled.querySelectorAll('label')]
       .find((label) => label.textContent?.includes('Template version'))
       ?.querySelector('select');
@@ -128,13 +125,13 @@ describe('HomePageComponent', () => {
       .find((button) => button.textContent?.trim() === 'Save');
 
     expect(bankSelect?.value).toBe('otp');
-    expect(ruleSetInput?.value).toBe('1.0');
+    expect(compiled.textContent).not.toContain('Rule set version');
     expect([...(templateVersionSelect?.options ?? [])].map((option) => option.value)).toEqual([
       'template-v1',
       'template-v2',
     ]);
     expect(templateVersionSelect?.value).toBe('template-v1');
-    if (!bankSelect || !nameInput || !ruleSetInput || !templateVersionSelect || !saveButton) {
+    if (!bankSelect || !nameInput || !templateVersionSelect || !saveButton) {
       throw new Error('Expected template configuration controls to be rendered.');
     }
 
@@ -144,13 +141,6 @@ describe('HomePageComponent', () => {
     templateVersionSelect.dispatchEvent(new Event('change'));
     nameInput.value = 'Test configuration';
     nameInput.dispatchEvent(new Event('input'));
-    ruleSetInput.value = '   ';
-    ruleSetInput.dispatchEvent(new Event('input'));
-    fixture.detectChanges();
-    expect(saveButton.disabled).toBe(true);
-
-    ruleSetInput.value = ' 2.0 ';
-    ruleSetInput.dispatchEvent(new Event('input'));
     fixture.detectChanges();
     expect(saveButton.disabled).toBe(false);
 
@@ -160,7 +150,6 @@ describe('HomePageComponent', () => {
     expect(request.request.method).toBe('POST');
     expect(request.request.body).toEqual({
       name: 'Test configuration',
-      ruleSetVersion: '2.0',
       templateVersion: 'template-v2',
       bank: 'raiffeisen',
     });
@@ -171,14 +160,6 @@ describe('HomePageComponent', () => {
     const fixture = TestBed.createComponent(CreateConfigurationPageComponent);
     fixture.detectChanges();
     const compiled = fixture.nativeElement as HTMLElement;
-    const ruleSetInput = [...compiled.querySelectorAll('label')]
-      .find((label) => label.textContent?.includes('Rule set version'))
-      ?.querySelector('input');
-    if (!ruleSetInput) {
-      throw new Error('Expected the template rule set version input to be rendered.');
-    }
-    ruleSetInput.value = '2.0';
-    ruleSetInput.dispatchEvent(new Event('input'));
     [...compiled.querySelectorAll('button')]
       .find((button) => button.textContent?.trim() === 'LLM')
       ?.click();
@@ -209,7 +190,6 @@ describe('HomePageComponent', () => {
     const request = TestBed.inject(HttpTestingController).expectOne('/api/configurations/llm');
     expect(request.request.body).toEqual({
       name: 'Test LLM configuration',
-      ruleSetVersion: '1.0',
       promptVersion: 'v1.1',
       modelName: 'qwen2.5-1.5b-instruct',
       modelParameters: {
@@ -223,7 +203,7 @@ describe('HomePageComponent', () => {
     request.flush({ id: 2, name: 'Test LLM configuration', bank: 'raiffeisen' });
   });
 
-  it('should hide rule set version and do_sample in configuration details', () => {
+  it('should hide internal model parameters in configuration details', () => {
     const fixture = TestBed.createComponent(ConfigurationPageComponent);
     fixture.detectChanges();
     const http = TestBed.inject(HttpTestingController);
@@ -231,7 +211,6 @@ describe('HomePageComponent', () => {
     http.expectOne('/api/configurations/1').flush({
       id: 1,
       name: 'Test configuration',
-      ruleSetVersion: 'hidden-version',
       generationMode: 'llm',
       modelParameters: { do_sample: true, temperature: 0.7 },
     });
