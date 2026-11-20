@@ -108,38 +108,60 @@ describe('HomePageComponent', () => {
     expect(modelSelect?.value).toBe('qwen2.5-1.5b-instruct');
   });
 
-  it('should default the bank to OTP and send the selected bank with template configurations', () => {
+  it('should send the selected bank, rule set version and template version', () => {
     const fixture = TestBed.createComponent(CreateConfigurationPageComponent);
     fixture.detectChanges();
     const compiled = fixture.nativeElement as HTMLElement;
-    expect(compiled.textContent).not.toContain('Rule set version');
     const bankSelect = [...compiled.querySelectorAll('label')]
       .find((label) => label.textContent?.includes('Bank'))
       ?.querySelector('select');
     const nameInput = [...compiled.querySelectorAll('label')]
       .find((label) => label.textContent?.includes('Name'))
       ?.querySelector('input');
+    const ruleSetInput = [...compiled.querySelectorAll('label')]
+      .find((label) => label.textContent?.includes('Rule set version'))
+      ?.querySelector('input');
+    const templateVersionSelect = [...compiled.querySelectorAll('label')]
+      .find((label) => label.textContent?.includes('Template version'))
+      ?.querySelector('select');
+    const saveButton = [...compiled.querySelectorAll('button')]
+      .find((button) => button.textContent?.trim() === 'Save');
 
     expect(bankSelect?.value).toBe('otp');
-    if (!bankSelect || !nameInput) {
-      throw new Error('Expected bank and name inputs to be rendered.');
+    expect(ruleSetInput?.value).toBe('1.0');
+    expect([...(templateVersionSelect?.options ?? [])].map((option) => option.value)).toEqual([
+      'template-v1',
+      'template-v2',
+    ]);
+    expect(templateVersionSelect?.value).toBe('template-v1');
+    if (!bankSelect || !nameInput || !ruleSetInput || !templateVersionSelect || !saveButton) {
+      throw new Error('Expected template configuration controls to be rendered.');
     }
 
     bankSelect.value = 'raiffeisen';
     bankSelect.dispatchEvent(new Event('change'));
+    templateVersionSelect.value = 'template-v2';
+    templateVersionSelect.dispatchEvent(new Event('change'));
     nameInput.value = 'Test configuration';
     nameInput.dispatchEvent(new Event('input'));
+    ruleSetInput.value = '   ';
+    ruleSetInput.dispatchEvent(new Event('input'));
     fixture.detectChanges();
+    expect(saveButton.disabled).toBe(true);
 
-    [...compiled.querySelectorAll('button')]
-      .find((button) => button.textContent?.trim() === 'Save')
-      ?.click();
+    ruleSetInput.value = ' 2.0 ';
+    ruleSetInput.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+    expect(saveButton.disabled).toBe(false);
+
+    saveButton.click();
 
     const request = TestBed.inject(HttpTestingController).expectOne('/api/configurations/template');
+    expect(request.request.method).toBe('POST');
     expect(request.request.body).toEqual({
       name: 'Test configuration',
-      ruleSetVersion: '1.0',
-      templateVersion: '1.0',
+      ruleSetVersion: '2.0',
+      templateVersion: 'template-v2',
       bank: 'raiffeisen',
     });
     request.flush({ id: 1, name: 'Test configuration', bank: 'raiffeisen' });
@@ -149,6 +171,14 @@ describe('HomePageComponent', () => {
     const fixture = TestBed.createComponent(CreateConfigurationPageComponent);
     fixture.detectChanges();
     const compiled = fixture.nativeElement as HTMLElement;
+    const ruleSetInput = [...compiled.querySelectorAll('label')]
+      .find((label) => label.textContent?.includes('Rule set version'))
+      ?.querySelector('input');
+    if (!ruleSetInput) {
+      throw new Error('Expected the template rule set version input to be rendered.');
+    }
+    ruleSetInput.value = '2.0';
+    ruleSetInput.dispatchEvent(new Event('input'));
     [...compiled.querySelectorAll('button')]
       .find((button) => button.textContent?.trim() === 'LLM')
       ?.click();

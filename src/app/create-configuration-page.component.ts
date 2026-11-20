@@ -45,8 +45,17 @@ import {
 
             @if (selectedType() === 'template') {
               <label class="field-group">
+                <span>Rule set version</span>
+                <input type="text" maxlength="50" [value]="templateRuleSetVersion()" (input)="templateRuleSetVersion.set($any($event.target).value)" placeholder="1.0" />
+              </label>
+
+              <label class="field-group">
                 <span>Template version</span>
-                <input type="text" maxlength="50" [value]="templateVersion()" (input)="templateVersion.set($any($event.target).value)" placeholder="1.0" />
+                <select [value]="templateVersion()" (change)="templateVersion.set($any($event.target).value)">
+                  @for (version of templateVersionOptions; track version) {
+                    <option [value]="version">{{ version }}</option>
+                  }
+                </select>
               </label>
             }
 
@@ -133,6 +142,7 @@ export class CreateConfigurationPageComponent {
   private readonly router = inject(Router);
   private readonly configurationService = inject(ConfigurationService);
 
+  protected readonly templateVersionOptions = ['template-v1', 'template-v2'] as const;
   protected readonly promptVersionOptions = ['v1.1', 'v1.2', 'v1.3', 'v1.4'] as const;
   protected readonly modelOptions = [
     {
@@ -145,7 +155,8 @@ export class CreateConfigurationPageComponent {
   protected readonly name = signal('');
   protected readonly bank = signal<BankName>('otp');
   protected readonly ruleSetVersion = signal('1.0');
-  protected readonly templateVersion = signal('1.0');
+  protected readonly templateRuleSetVersion = signal('1.0');
+  protected readonly templateVersion = signal<(typeof this.templateVersionOptions)[number]>('template-v1');
   protected readonly promptVersion = signal<(typeof this.promptVersionOptions)[number]>('v1.1');
   protected readonly modelName = signal(this.modelOptions[0].id);
   protected readonly selectedModelDescription = computed(
@@ -162,10 +173,11 @@ export class CreateConfigurationPageComponent {
       value.trim().length > 0 && value.trim().length <= maxLength;
     return (
       validVersion(this.name(), 100) &&
-      validVersion(this.ruleSetVersion(), 50) &&
       (this.selectedType() === 'template'
-        ? validVersion(this.templateVersion(), 50)
-        : validVersion(this.promptVersion(), 50) && validVersion(this.modelName(), 100))
+        ? validVersion(this.templateRuleSetVersion(), 50) && validVersion(this.templateVersion(), 50)
+        : validVersion(this.ruleSetVersion(), 50) &&
+          validVersion(this.promptVersion(), 50) &&
+          validVersion(this.modelName(), 100))
     );
   });
 
@@ -180,7 +192,7 @@ export class CreateConfigurationPageComponent {
     if (this.selectedType() === 'template') {
       const request: RequestTemplateConfiguration = {
         name: this.name().trim(),
-        ruleSetVersion: this.ruleSetVersion().trim(),
+        ruleSetVersion: this.templateRuleSetVersion().trim(),
         templateVersion: this.templateVersion().trim(),
         bank: this.bank(),
       };

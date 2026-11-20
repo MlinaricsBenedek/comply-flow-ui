@@ -324,8 +324,9 @@ A kiválasztott típustól függően jelenjenek meg a releváns mezők.
 Mezők:
 
 * name
+* bank
 * ruleSetVersion
-* templateVersion
+* templateVersion (`template-v1` vagy `template-v2`)
 
 Mentés:
 
@@ -336,8 +337,9 @@ Request:
 ```json
 {
   "name": "Template Configuration",
+  "bank": "otp",
   "ruleSetVersion": "1.0",
-  "templateVersion": "1.0"
+  "templateVersion": "template-v1"
 }
 ```
 
