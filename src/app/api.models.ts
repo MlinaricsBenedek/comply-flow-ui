@@ -8,10 +8,13 @@ export interface ConfigurationSummaryResponse {
 
 export interface ConfigurationResponse extends ConfigurationSummaryResponse {
   generationMode: string | null;
+  bank?: string | null;
   templateVersion?: string | null;
   promptVersion?: string | null;
   modelName?: string | null;
   modelParameters?: JsonObject | null;
+  retrievalTopK?: number | null;
+  retrievalMinSimilarity?: number | null;
 }
 
 export interface RequestTemplateConfiguration {
@@ -26,6 +29,15 @@ export interface RequestLlmConfiguration {
   modelName: string;
   modelParameters: JsonObject;
   bank: BankName;
+}
+
+export interface RequestRagConfiguration {
+  name: string;
+  bank: BankName;
+  retrievalTopK: number;
+  retrievalMinSimilarity: number;
+  modelName: string;
+  modelParameters: JsonObject;
 }
 
 export interface RequestConversation {

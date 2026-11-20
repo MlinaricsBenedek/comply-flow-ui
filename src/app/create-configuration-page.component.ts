@@ -5,6 +5,7 @@ import {
   BankName,
   JsonObject,
   RequestLlmConfiguration,
+  RequestRagConfiguration,
   RequestTemplateConfiguration,
 } from './api.models';
 
@@ -27,6 +28,7 @@ import {
           <div class="type-toggle">
             <button type="button" class="toggle-button" [class.active]="selectedType() === 'template'" (click)="selectedType.set('template')">Template</button>
             <button type="button" class="toggle-button" [class.active]="selectedType() === 'llm'" (click)="selectedType.set('llm')">LLM</button>
+            <button type="button" class="toggle-button" [class.active]="selectedType() === 'rag'" (click)="selectedType.set('rag')">RAG</button>
           </div>
 
           <div class="field-grid">
@@ -66,7 +68,20 @@ import {
                   }
                 </select>
               </label>
+            }
 
+            @if (selectedType() === 'rag') {
+              <label class="field-group">
+                <span>Retrieval top K</span>
+                <input type="number" min="1" max="2147483647" step="1" [value]="retrievalTopK()" (input)="retrievalTopK.set($any($event.target).valueAsNumber)" />
+              </label>
+              <label class="field-group">
+                <span>Retrieval min similarity</span>
+                <input type="number" min="0" max="1" step="any" [value]="retrievalMinSimilarity()" (input)="retrievalMinSimilarity.set($any($event.target).valueAsNumber)" />
+              </label>
+            }
+
+            @if (selectedType() !== 'template') {
               <label class="field-group">
                 <span>Model</span>
                 <select [value]="modelName()" (change)="modelName.set($any($event.target).value)">
@@ -146,7 +161,7 @@ export class CreateConfigurationPageComponent {
       description: 'Alapértelmezett válaszgeneráló modell',
     },
   ];
-  protected readonly selectedType = signal<'template' | 'llm'>('template');
+  protected readonly selectedType = signal<'template' | 'llm' | 'rag'>('template');
   protected readonly name = signal('');
   protected readonly bank = signal<BankName>('otp');
   protected readonly templateVersion = signal<(typeof this.templateVersionOptions)[number]>('template-v1');
@@ -157,8 +172,9 @@ export class CreateConfigurationPageComponent {
   );
   protected readonly temperature = signal(0.7);
   protected readonly maxNewTokens = signal(180);
-  protected readonly doSample = signal(true);
   protected readonly topP = signal(0.9);
+  protected readonly retrievalTopK = signal(5);
+  protected readonly retrievalMinSimilarity = signal(0.5);
   protected readonly isSaving = signal(false);
   protected readonly errorMessage = signal<string | null>(null);
   protected readonly canSave = computed(() => {
@@ -168,8 +184,15 @@ export class CreateConfigurationPageComponent {
       validVersion(this.name(), 100) &&
       (this.selectedType() === 'template'
         ? validVersion(this.templateVersion(), 50)
-        : validVersion(this.promptVersion(), 50) &&
-          validVersion(this.modelName(), 100))
+        : validVersion(this.modelName(), 100) &&
+          (this.selectedType() === 'llm'
+            ? validVersion(this.promptVersion(), 50)
+            : Number.isInteger(this.retrievalTopK()) &&
+              this.retrievalTopK() >= 1 &&
+              this.retrievalTopK() <= 2147483647 &&
+              Number.isFinite(this.retrievalMinSimilarity()) &&
+              this.retrievalMinSimilarity() >= 0 &&
+              this.retrievalMinSimilarity() <= 1))
     );
   });
 
@@ -196,10 +219,25 @@ export class CreateConfigurationPageComponent {
 
     const modelParameters: JsonObject = {
       max_new_tokens: this.maxNewTokens(),
-      do_sample: this.doSample(),
       temperature: this.temperature(),
       top_p: this.topP(),
     };
+    if (this.selectedType() === 'rag') {
+      const request: RequestRagConfiguration = {
+        name: this.name().trim(),
+        bank: this.bank(),
+        retrievalTopK: this.retrievalTopK(),
+        retrievalMinSimilarity: this.retrievalMinSimilarity(),
+        modelName: this.modelName().trim(),
+        modelParameters,
+      };
+      this.configurationService.createRagConfiguration(request).subscribe({
+        next: (config) => this.finishSave(config.id),
+        error: (error: unknown) => this.handleSaveError(error),
+      });
+      return;
+    }
+
     const request: RequestLlmConfiguration = {
       name: this.name().trim(),
       promptVersion: this.promptVersion().trim(),

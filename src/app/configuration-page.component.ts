@@ -80,6 +80,12 @@ import { ConfigurationSummaryResponse, JsonObject } from './api.models';
                   <span>Generation mode</span>
                   <strong>{{ selectedConfiguration().generationMode ?? '—' }}</strong>
                 </div>
+                @if (selectedConfiguration().bank) {
+                  <div class="meta-item">
+                    <span>Bank</span>
+                    <strong>{{ selectedConfiguration().bank }}</strong>
+                  </div>
+                }
                 @if (selectedConfiguration().templateVersion) {
                   <div class="meta-item">
                     <span>Template version</span>
@@ -96,6 +102,18 @@ import { ConfigurationSummaryResponse, JsonObject } from './api.models';
                   <div class="meta-item">
                     <span>Model name</span>
                     <strong>{{ selectedConfiguration().modelName }}</strong>
+                  </div>
+                }
+                @if (selectedConfiguration().retrievalTopK != null) {
+                  <div class="meta-item">
+                    <span>Retrieval top K</span>
+                    <strong>{{ selectedConfiguration().retrievalTopK }}</strong>
+                  </div>
+                }
+                @if (selectedConfiguration().retrievalMinSimilarity != null) {
+                  <div class="meta-item">
+                    <span>Retrieval min similarity</span>
+                    <strong>{{ selectedConfiguration().retrievalMinSimilarity }}</strong>
                   </div>
                 }
               </div>
@@ -145,6 +163,7 @@ import { ConfigurationSummaryResponse, JsonObject } from './api.models';
     '.type-badge { display: inline-flex; align-items: center; border-radius: 999px; padding: 5px 10px; font-size: 0.7rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; }',
     '.type-template { background: #dcfce7; color: #166534; }',
     '.type-llm { background: #ede9fe; color: #5b21b6; }',
+    '.type-rag { background: #dbeafe; color: #1d4ed8; }',
     '.config-card h3 { font-size: 1.1rem; margin-bottom: 6px; }',
     '.config-card p { color: #64748b; }',
     '.detail-card { min-height: 420px; }',
@@ -234,7 +253,10 @@ export class ConfigurationPageComponent implements OnInit {
       .filter(([key]) => key !== 'do_sample')
       .map(([key, value]) => [key, String(value)]);
 
-  protected configurationType(generationMode: string | null): 'Template' | 'LLM' {
+  protected configurationType(generationMode: string | null): 'Template' | 'LLM' | 'RAG' {
+    if (generationMode?.toLowerCase() === 'rag') {
+      return 'RAG';
+    }
     return generationMode?.toLowerCase() === 'llm' ? 'LLM' : 'Template';
   }
 

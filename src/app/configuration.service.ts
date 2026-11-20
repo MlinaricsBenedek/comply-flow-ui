@@ -6,6 +6,7 @@ import {
   ConfigurationSummaryResponse,
   JsonObject,
   RequestLlmConfiguration,
+  RequestRagConfiguration,
   RequestTemplateConfiguration,
 } from './api.models';
 import { getApiBaseUrl } from './api-url';
@@ -36,6 +37,10 @@ export class ConfigurationService {
 
   createLlmConfiguration(request: RequestLlmConfiguration): Observable<ConfigurationResponse> {
     return this.http.post<ConfigurationResponse>(`${this.apiBaseUrl}/configurations/llm`, request);
+  }
+
+  createRagConfiguration(request: RequestRagConfiguration): Observable<ConfigurationResponse> {
+    return this.http.post<ConfigurationResponse>(`${this.apiBaseUrl}/configurations/rag`, request);
   }
 
   static getErrorMessage(error: unknown): string {

@@ -194,13 +194,102 @@ describe('HomePageComponent', () => {
       modelName: 'qwen2.5-1.5b-instruct',
       modelParameters: {
         max_new_tokens: 180,
-        do_sample: true,
         temperature: 0.7,
         top_p: 0.9,
       },
       bank: 'raiffeisen',
     });
     request.flush({ id: 2, name: 'Test LLM configuration', bank: 'raiffeisen' });
+  });
+
+  it('should validate retrieval settings and create a RAG configuration', () => {
+    const fixture = TestBed.createComponent(CreateConfigurationPageComponent);
+    fixture.detectChanges();
+    const compiled = fixture.nativeElement as HTMLElement;
+    [...compiled.querySelectorAll('button')]
+      .find((button) => button.textContent?.trim() === 'RAG')
+      ?.click();
+    fixture.detectChanges();
+
+    const input = (label: string) => [...compiled.querySelectorAll('label')]
+      .find((element) => element.textContent?.includes(label))?.querySelector('input');
+    const name = input('Name');
+    const topK = input('Retrieval top K');
+    const similarity = input('Retrieval min similarity');
+    const bank = [...compiled.querySelectorAll('label')]
+      .find((label) => label.textContent?.includes('Bank'))?.querySelector('select');
+    const save = [...compiled.querySelectorAll('button')]
+      .find((button) => button.textContent?.trim() === 'Save');
+    if (!name || !topK || !similarity || !bank || !save) {
+      throw new Error('Expected RAG configuration controls to be rendered.');
+    }
+
+    name.value = 'RAG configuration';
+    name.dispatchEvent(new Event('input'));
+    bank.value = 'raiffeisen';
+    bank.dispatchEvent(new Event('change'));
+    topK.value = '1.5';
+    topK.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+    expect(save.disabled).toBe(true);
+
+    topK.value = '2147483648';
+    topK.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+    expect(save.disabled).toBe(true);
+
+    topK.value = '10';
+    topK.dispatchEvent(new Event('input'));
+    similarity.value = '';
+    similarity.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+    expect(save.disabled).toBe(true);
+
+    similarity.value = '0';
+    similarity.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+    expect(save.disabled).toBe(false);
+    expect(compiled.textContent).not.toContain('Prompt version');
+    save.click();
+
+    const request = TestBed.inject(HttpTestingController).expectOne('/api/configurations/rag');
+    expect(request.request.method).toBe('POST');
+    expect(request.request.body).toEqual({
+      name: 'RAG configuration',
+      bank: 'raiffeisen',
+      retrievalTopK: 10,
+      retrievalMinSimilarity: 0,
+      modelName: 'qwen2.5-1.5b-instruct',
+      modelParameters: { max_new_tokens: 180, temperature: 0.7, top_p: 0.9 },
+    });
+    request.flush({ id: 3, name: 'RAG configuration' });
+  });
+
+  it('should show RAG configuration details including zero similarity', () => {
+    const fixture = TestBed.createComponent(ConfigurationPageComponent);
+    fixture.detectChanges();
+    const http = TestBed.inject(HttpTestingController);
+    http.expectOne('/api/configurations').flush([{ id: 3, name: 'RAG configuration' }]);
+    http.expectOne('/api/configurations/3').flush({
+      id: 3,
+      name: 'RAG configuration',
+      bank: 'otp',
+      generationMode: 'rag',
+      retrievalTopK: 5,
+      retrievalMinSimilarity: 0,
+      modelName: 'qwen2.5-1.5b-instruct',
+      modelParameters: { temperature: 0.7 },
+    });
+    fixture.detectChanges();
+
+    const compiled = fixture.nativeElement as HTMLElement;
+    expect(compiled.querySelector('.type-rag')?.textContent).toContain('RAG');
+    expect(compiled.textContent).toContain('otp');
+    const similarity = [...compiled.querySelectorAll('.meta-item')]
+      .find((element) => element.textContent?.includes('Retrieval min similarity'));
+    expect(similarity?.querySelector('strong')?.textContent?.trim()).toBe('0');
+    expect(compiled.textContent).toContain('Retrieval top K');
+    expect(compiled.textContent).toContain('temperature');
   });
 
   it('should hide internal model parameters in configuration details', () => {
